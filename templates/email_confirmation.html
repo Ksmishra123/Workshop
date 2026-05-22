@@ -7,7 +7,7 @@
     <table width="600" cellpadding="0" cellspacing="0" border="0" style="max-width:600px;width:100%;">
       <tr><td style="background-color:#1E3A0F;border-radius:16px 16px 0 0;padding:32px 36px 0;">
         <p style="margin:0 0 10px;font-family:Arial,Helvetica,sans-serif;font-size:10px;font-weight:bold;letter-spacing:0.16em;text-transform:uppercase;color:#C9A84C;">On Stage America</p>
-        <p style="margin:0 0 6px;font-family:Georgia,'Times New Roman',serif;font-size:36px;font-weight:normal;color:#ffffff;line-height:1.1;">You're Registered!</p>
+        <p style="margin:0 0 6px;font-family:Georgia,'Times New Roman',serif;font-size:36px;font-weight:normal;color:#ffffff;line-height:1.1;">{% if to_studio %}{{ reg.full_name }} is Registered!{% else %}You're Registered!{% endif %}</p>
         <p style="margin:0 0 16px;font-family:Arial,Helvetica,sans-serif;font-size:14px;color:rgba(255,255,255,0.5);">Workshop Registration Confirmed</p>
         <table cellpadding="0" cellspacing="0" border="0" style="margin-bottom:28px;"><tr>
           <td style="background-color:rgba(255,255,255,0.1);border:1px solid rgba(255,255,255,0.15);border-radius:100px;padding:6px 14px;">
@@ -22,9 +22,11 @@
       </td></tr>
       <tr><td style="background:linear-gradient(90deg,#C9A84C 0%,#4A7A26 50%,#C9A84C 100%);height:3px;font-size:0;">&nbsp;</td></tr>
       <tr><td style="background-color:#ffffff;padding:36px;">
-        <p style="margin:0 0 10px;font-family:Georgia,'Times New Roman',serif;font-size:22px;color:#1A1814;">Hi {{ reg.first_name }},</p>
+        <p style="margin:0 0 10px;font-family:Georgia,'Times New Roman',serif;font-size:22px;color:#1A1814;">{% if to_studio %}Hi {{ reg.studio_name }},{% else %}Hi {{ reg.first_name }},{% endif %}</p>
         <p style="margin:0 0 24px;font-family:Arial,Helvetica,sans-serif;font-size:14px;color:#5A5750;line-height:1.75;">
-          {% if reg.is_title %}Your workshop registration has been confirmed as a Title registrant. No payment is required. Your QR check-in code is below.
+          {% if to_studio %}
+            <strong>{{ reg.full_name }}</strong> has been registered for the On Stage America Workshop{% if reg.is_title %} as a Title Registrant (no charge){% endif %}. The QR check-in pass below should be printed or saved and given to the student to present at the event.
+          {% elif reg.is_title %}Your workshop registration has been confirmed as a Title registrant. No payment is required. Your QR check-in code is below.
           {% else %}Your registration and payment have been confirmed. Your QR check-in code is below — show it at the check-in desk on event day.{% endif %}
         </p>
 
@@ -43,16 +45,17 @@
         <!-- QR CODE — embedded as base64, works in all email clients -->
         <table width="100%" cellpadding="0" cellspacing="0" border="0" style="border:1.5px dashed #C8C4BC;border-radius:12px;margin-bottom:24px;">
           <tr><td style="padding:28px 24px;text-align:center;">
-            <p style="margin:0 0 4px;font-family:Arial,Helvetica,sans-serif;font-size:10px;font-weight:bold;letter-spacing:0.12em;text-transform:uppercase;color:#8A8780;">Your Check-In Pass</p>
-            <p style="margin:0 0 6px;font-family:Georgia,'Times New Roman',serif;font-size:20px;color:#1A1814;">Scan to Check In at the Event</p>
-            <p style="margin:0 0 18px;font-family:Arial,Helvetica,sans-serif;font-size:13px;color:#5A5750;line-height:1.6;">Screenshot or print this email and show this QR code<br/>at the check-in desk when you arrive.</p>
+            <p style="margin:0 0 4px;font-family:Arial,Helvetica,sans-serif;font-size:10px;font-weight:bold;letter-spacing:0.12em;text-transform:uppercase;color:#8A8780;">Check-In Pass</p>
+            <p style="margin:0 0 6px;font-family:Georgia,'Times New Roman',serif;font-size:24px;font-weight:bold;color:#1E3A0F;">{{ reg.full_name }}</p>
+            <p style="margin:0 0 4px;font-family:Arial,Helvetica,sans-serif;font-size:12px;color:#8A8780;">{{ reg.studio_name }}</p>
+            <p style="margin:0 0 16px;font-family:Arial,Helvetica,sans-serif;font-size:12px;color:#8A8780;">{{ reg.reg_label }}</p>
             <table cellpadding="0" cellspacing="0" border="0" style="margin:0 auto 12px;">
               <tr><td style="background:#fff;border:1px solid #DDD9D0;border-radius:10px;padding:14px;">
-                <!-- QR code embedded as base64 PNG — no external requests, works everywhere -->
                 <img src="data:image/png;base64,{{ qr_inline }}" width="180" height="180" alt="Check-in QR Code" style="display:block;border-radius:4px;">
               </td></tr>
             </table>
-            <p style="margin:0;font-family:'Courier New',Courier,monospace;font-size:11px;color:#8A8780;">Ref # {{ reg.id }}</p>
+            <p style="margin:0 0 12px;font-family:'Courier New',Courier,monospace;font-size:11px;color:#8A8780;">Ref # {{ reg.id }}</p>
+            <p style="margin:0;font-family:Arial,Helvetica,sans-serif;font-size:12px;color:#5A5750;">{% if to_studio %}Print and distribute this pass to the student.{% else %}Show this QR code at the check-in desk on event day.{% endif %}</p>
           </td></tr>
         </table>
 

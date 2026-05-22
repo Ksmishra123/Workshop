@@ -49,6 +49,8 @@ class Registration(db.Model):
     amount        = db.Column(db.Integer, default=0)  # in cents
     payment_id    = db.Column(db.String(200))
     payment_status= db.Column(db.String(50), default='pending')
+    # Studio contact (for bulk CSV registrations without a student email)
+    studio_email  = db.Column(db.String(200))
     # Check-in
     checked_in    = db.Column(db.Boolean, default=False)
     checkin_time  = db.Column(db.DateTime)
@@ -133,23 +135,35 @@ def send_confirmation_email(reg: Registration):
         print('No SendGrid key — skipping email')
         return
 
+    # If no student email, fall back to studio contact email
+    to_email   = (reg.email or '').strip() or (reg.studio_email or '').strip()
+    to_studio  = not bool((reg.email or '').strip())  # True = sending to studio, not student
+
+    if not to_email:
+        print(f'No email for {reg.full_name} — skipping confirmation email')
+        return
+
     base_url  = os.environ.get('BASE_URL', 'http://localhost:5000')
     qr_data   = f'{base_url}/confirm/{reg.id}'
     qr_bytes  = generate_qr_bytes(qr_data)
     qr_b64    = base64.b64encode(qr_bytes).decode()
     qr_inline = generate_qr_base64(qr_data)
 
-    base_url = os.environ.get('BASE_URL', 'http://localhost:5000')
     confirmation_url = f'{base_url}/confirm/{reg.id}'
     html = render_template('email_confirmation.html',
                            reg=reg,
                            qr_inline=qr_inline,
-                           confirmation_url=confirmation_url)
+                           confirmation_url=confirmation_url,
+                           to_studio=to_studio)
+
+    subject = (f'{reg.full_name} is Registered! — On Stage America Workshop'
+               if to_studio else
+               'You\'re Registered! — On Stage America Workshop')
 
     message = Mail(
         from_email=('osa@onstageamerica.com', 'On Stage America'),
-        to_emails=reg.email,
-        subject='You\'re Registered! — On Stage America Workshop',
+        to_emails=to_email,
+        subject=subject,
         html_content=html
     )
 
@@ -445,13 +459,14 @@ def admin_export():
 def registration_template():
     from flask import Response
     headers = [
-        'studio_name', 'first_name', 'last_name', 'gender', 'birth_date',
+        'studio_name', 'studio_email', 'first_name', 'last_name', 'gender', 'birth_date',
         'email', 'phone', 'mobile', 'is_title', 'routine_name',
         'reg_type', 'tshirt_size',
     ]
     notes = [
-        'Your Studio Name', 'First', 'Last', 'Female / Male / Non-binary',
-        'MM/DD/YYYY', 'email@example.com', '555-000-0000', '555-000-0000',
+        'Your Studio Name', 'studio@example.com (receives QR if no student email)',
+        'First', 'Last', 'Female / Male / Non-binary',
+        'MM/DD/YYYY', 'student@example.com (leave blank if unknown)', '555-000-0000', '555-000-0000',
         'yes / no', 'Routine name if title registrant (else leave blank)',
         'workshop / opening / both', 'YS / YM / YL / AS / AM / AL / AXL / AXXL',
     ]
@@ -518,6 +533,7 @@ def admin_upload_process():
             email         = row.get('email', '').lower(),
             phone         = row.get('phone', ''),
             mobile        = row.get('mobile', ''),
+            studio_email  = row.get('studio_email', '').lower(),
             is_title      = is_title,
             routine_name  = row.get('routine_name', ''),
             reg_type      = reg_type,

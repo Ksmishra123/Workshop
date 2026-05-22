@@ -115,9 +115,10 @@
 
     <!-- QR CODE — generated server-side, always works -->
     <div class="qr-section">
-      <div class="qr-eyebrow">Your Check-In Pass</div>
-      <div class="qr-title">Scan to Check In at the Event</div>
-      <div class="qr-desc">Screenshot or print this page and show this QR code<br>at the check-in desk when you arrive.</div>
+      <div class="qr-eyebrow">Check-In Pass</div>
+      <div class="qr-title">{{ reg.full_name }}</div>
+      <div style="font-size:13px;color:var(--muted);margin-bottom:4px;">{{ reg.studio_name }}</div>
+      <div style="font-size:12px;color:var(--light);margin-bottom:16px;">{{ reg.reg_label }}</div>
       <div class="qr-frame">
         <img src="data:image/png;base64,{{ qr_inline }}" alt="Check-in QR Code" width="180" height="180">
       </div>
