@@ -364,10 +364,15 @@
     if (data.is_title === 'no' && !data.reg_type) { showError('Please select a registration type.'); resetBtn(); return; }
 
     // Tokenize payment if needed
-    if (data.is_title === 'no' && squareCard) {
+    if (data.is_title === 'no') {
+      if (!squareCard) {
+        showError('Payment form not loaded. Please refresh the page and try again.');
+        resetBtn(); return;
+      }
       const result = await squareCard.tokenize();
       if (result.status !== 'OK') {
-        showError('Payment error: ' + (result.errors?.[0]?.message || 'Invalid card details'));
+        const msg = result.errors?.[0]?.message || result.status || 'Invalid card details';
+        showError('Payment error: ' + msg);
         resetBtn(); return;
       }
       data.payment_token = result.token;
