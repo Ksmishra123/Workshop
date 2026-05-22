@@ -4,7 +4,11 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>OSA Workshop Registration</title>
+{% if sq_env == 'production' %}
+<script src="https://web.squarecdn.com/v1/square.js"></script>
+{% else %}
 <script src="https://sandbox.web.squarecdn.com/v1/square.js"></script>
+{% endif %}
 <style>
   *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
   :root {

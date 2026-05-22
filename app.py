@@ -9,7 +9,8 @@ from flask import Flask, render_template, request, redirect, url_for, jsonify, s
 from flask_sqlalchemy import SQLAlchemy
 from sendgrid import SendGridAPIClient
 from sendgrid.helpers.mail import Mail, Attachment, FileContent, FileName, FileType, Disposition
-import square.client
+from square import Square
+from square.environment import SquareEnvironment
 
 app = Flask(__name__)
 app.secret_key = os.environ.get('SECRET_KEY', 'dev-secret-change-in-prod')
@@ -134,9 +135,12 @@ def send_confirmation_email(reg: Registration):
     qr_b64    = base64.b64encode(qr_bytes).decode()
     qr_inline = generate_qr_base64(qr_data)
 
+    base_url = os.environ.get('BASE_URL', 'http://localhost:5000')
+    confirmation_url = f'{base_url}/confirm/{reg.id}'
     html = render_template('email_confirmation.html',
                            reg=reg,
-                           qr_inline=qr_inline)
+                           qr_inline=qr_inline,
+                           confirmation_url=confirmation_url)
 
     message = Mail(
         from_email=('osa@onstageamerica.com', 'On Stage America'),
@@ -166,10 +170,8 @@ def send_confirmation_email(reg: Registration):
 def get_square_client():
     env = os.environ.get('SQUARE_ENV', 'sandbox')
     token = os.environ.get('SQUARE_ACCESS_TOKEN', '')
-    return square.client.Client(
-        access_token=token,
-        environment=env
-    )
+    environment = SquareEnvironment.PRODUCTION if env == 'production' else SquareEnvironment.SANDBOX
+    return Square(token=token, environment=environment)
 
 # ────────────────────────────────────────
 # ROUTES
@@ -225,23 +227,16 @@ def submit_registration():
         if not source_id:
             return jsonify({'error': 'No payment token'}), 400
         try:
-            client   = get_square_client()
-            result   = client.payments.create_payment({
-                'source_id':      source_id,
-                'idempotency_key': reg.id,
-                'amount_money': {
-                    'amount':   amount,
-                    'currency': 'USD'
-                },
-                'note': f'OSA Workshop — {reg.full_name} — {reg.reg_label}',
-                'buyer_email_address': reg.email,
-            })
-            if result.is_success():
-                reg.payment_id     = result.body['payment']['id']
-                reg.payment_status = 'paid'
-            else:
-                errors = result.errors
-                return jsonify({'error': errors[0]['detail'] if errors else 'Payment failed'}), 400
+            client = get_square_client()
+            result = client.payments.create(
+                source_id=source_id,
+                idempotency_key=reg.id,
+                amount_money={'amount': amount, 'currency': 'USD'},
+                note=f'OSA Workshop — {reg.full_name} — {reg.reg_label}',
+                buyer_email_address=reg.email,
+            )
+            reg.payment_id     = result.payment.id
+            reg.payment_status = 'paid'
         except Exception as e:
             return jsonify({'error': str(e)}), 500
     elif is_title:
@@ -260,7 +255,7 @@ def submit_registration():
 # ── CONFIRMATION PAGE ──
 @app.route('/confirm/<reg_id>')
 def confirm(reg_id):
-    reg = Registration.query.get_or_404(reg_id)
+    reg = db.get_or_404(Registration, reg_id)
     qr_data   = f'CHECKIN:{reg.id}'
     qr_inline = generate_qr_base64(qr_data)
     return render_template('confirm.html', reg=reg, qr_inline=qr_inline)
@@ -269,7 +264,7 @@ def confirm(reg_id):
 @app.route('/qr/<reg_id>.png')
 def qr_image(reg_id):
     from flask import Response
-    reg = Registration.query.get_or_404(reg_id)
+    reg = db.get_or_404(Registration, reg_id)
     qr_bytes = generate_qr_bytes(f'CHECKIN:{reg.id}')
     return Response(qr_bytes, mimetype='image/png')
 
@@ -285,7 +280,7 @@ def checkin_lookup():
     # Handle CHECKIN:uuid format from QR
     if raw.upper().startswith('CHECKIN:'):
         raw = raw.split(':', 1)[1]
-    reg = Registration.query.get(raw)
+    reg = db.session.get(Registration, raw)
     if not reg:
         return jsonify({'error': 'No registration found for this ID'}), 404
     return jsonify({'registration': reg.to_dict()})
@@ -294,7 +289,7 @@ def checkin_lookup():
 def checkin_confirm():
     data   = request.get_json()
     reg_id = data.get('id')
-    reg    = Registration.query.get(reg_id)
+    reg    = db.session.get(Registration, reg_id)
     if not reg:
         return jsonify({'error': 'Registration not found'}), 404
     if reg.checked_in:
@@ -313,7 +308,7 @@ def checkin_confirm():
 def checkin_undo():
     data   = request.get_json()
     reg_id = data.get('id')
-    reg    = Registration.query.get(reg_id)
+    reg    = db.session.get(Registration, reg_id)
     if not reg:
         return jsonify({'error': 'Not found'}), 404
     reg.checked_in   = False
