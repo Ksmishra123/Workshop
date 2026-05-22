@@ -28,13 +28,23 @@
   .main { padding: 28px; }
 
   /* Stats */
-  .stats-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 14px; margin-bottom: 28px; }
-  .stat-card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-lg); padding: 20px 22px; box-shadow: var(--shadow); }
+  .stats-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 14px; margin-bottom: 14px; }
+  .stats-grid-2 { display: grid; grid-template-columns: repeat(4, 1fr); gap: 14px; margin-bottom: 28px; }
+  .stat-card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-lg); padding: 20px 22px; box-shadow: var(--shadow); position: relative; }
   .stat-label { font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.08em; color: var(--light); margin-bottom: 6px; }
   .stat-val { font-size: 32px; font-weight: 700; font-family: 'Courier New', monospace; line-height: 1; }
   .stat-val.green { color: var(--green-mid); }
   .stat-val.gold { color: var(--gold); }
   .stat-val.blue { color: #4A5080; }
+  .stat-val.purple { color: #6A3080; }
+  .stat-sub { font-size: 11px; color: var(--light); margin-top: 5px; }
+  .live-dot { display: inline-block; width: 7px; height: 7px; border-radius: 50%; background: #6FCF3A; margin-right: 5px; animation: pulse 2s ease-in-out infinite; }
+  @keyframes pulse { 0%,100%{opacity:1}50%{opacity:0.3} }
+  .stats-header { display: flex; align-items: center; margin-bottom: 12px; font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.08em; color: var(--light); }
+  .last-updated { margin-left: auto; font-size: 11px; color: var(--light); font-weight: normal; text-transform: none; letter-spacing: 0; }
+  @media (max-width: 768px) {
+    .stats-grid, .stats-grid-2 { grid-template-columns: repeat(2, 1fr); }
+  }
 
   /* Search & filter */
   .toolbar { display: flex; gap: 12px; margin-bottom: 18px; flex-wrap: wrap; align-items: center; }
@@ -90,22 +100,45 @@
 <div class="main">
 
   <!-- STATS -->
+  <div class="stats-header">
+    <span class="live-dot"></span> Live Stats
+    <span class="last-updated" id="last-updated">Updating…</span>
+  </div>
   <div class="stats-grid">
     <div class="stat-card">
       <div class="stat-label">Total Registered</div>
-      <div class="stat-val">{{ total }}</div>
+      <div class="stat-val" id="s-total">{{ total }}</div>
     </div>
     <div class="stat-card">
       <div class="stat-label">Checked In</div>
-      <div class="stat-val green">{{ checked }}</div>
+      <div class="stat-val green" id="s-checked">{{ checked }}</div>
+      <div class="stat-sub" id="s-pending">{{ total - checked }} pending</div>
     </div>
     <div class="stat-card">
       <div class="stat-label">Title Registrants</div>
-      <div class="stat-val blue">{{ title }}</div>
+      <div class="stat-val blue" id="s-title">{{ title }}</div>
     </div>
     <div class="stat-card">
       <div class="stat-label">Revenue Collected</div>
-      <div class="stat-val gold">${{ '%.2f' | format(revenue / 100) }}</div>
+      <div class="stat-val gold" id="s-revenue">${{ '%.2f' | format(revenue / 100) }}</div>
+    </div>
+  </div>
+  <div class="stats-grid-2">
+    <div class="stat-card">
+      <div class="stat-label">Workshop Only</div>
+      <div class="stat-val green" id="s-workshop">—</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-label">Opening Number Only</div>
+      <div class="stat-val blue" id="s-opening">—</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-label">Workshop &amp; Opening</div>
+      <div class="stat-val purple" id="s-both">—</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-label">Not Yet Checked In</div>
+      <div class="stat-val" id="s-pending2">—</div>
     </div>
   </div>
 
@@ -205,6 +238,29 @@
       row.style.display = (matchQ && matchReg && matchCi) ? '' : 'none';
     });
   }
+
+  async function refreshStats() {
+    try {
+      const res  = await fetch('/admin/stats');
+      if (!res.ok) return;
+      const d = await res.json();
+      document.getElementById('s-total').textContent   = d.total;
+      document.getElementById('s-checked').textContent = d.checked;
+      document.getElementById('s-pending').textContent = d.pending + ' pending';
+      document.getElementById('s-title').textContent   = d.title;
+      document.getElementById('s-revenue').textContent = '$' + (d.revenue / 100).toFixed(2);
+      document.getElementById('s-workshop').textContent = d.workshop;
+      document.getElementById('s-opening').textContent  = d.opening;
+      document.getElementById('s-both').textContent     = d.both;
+      document.getElementById('s-pending2').textContent = d.pending;
+      const now = new Date();
+      document.getElementById('last-updated').textContent =
+        'Updated ' + now.toLocaleTimeString([], {hour:'2-digit', minute:'2-digit', second:'2-digit'});
+    } catch(e) {}
+  }
+
+  refreshStats();
+  setInterval(refreshStats, 30000);
 </script>
 </body>
 </html>

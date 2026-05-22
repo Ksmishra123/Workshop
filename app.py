@@ -372,6 +372,29 @@ def admin():
                            title=title,
                            revenue=revenue)
 
+@app.route('/admin/stats')
+def admin_stats():
+    if not session.get('admin'):
+        abort(403)
+    regs = Registration.query.all()
+    total    = len(regs)
+    checked  = sum(1 for r in regs if r.checked_in)
+    title    = sum(1 for r in regs if r.is_title)
+    revenue  = sum(r.amount for r in regs if r.payment_status == 'paid')
+    workshop = sum(1 for r in regs if r.reg_type == 'workshop')
+    opening  = sum(1 for r in regs if r.reg_type == 'opening')
+    both     = sum(1 for r in regs if r.reg_type == 'both')
+    return jsonify({
+        'total':    total,
+        'checked':  checked,
+        'pending':  total - checked,
+        'title':    title,
+        'revenue':  revenue,
+        'workshop': workshop,
+        'opening':  opening,
+        'both':     both,
+    })
+
 @app.route('/admin/login', methods=['GET', 'POST'])
 def admin_login():
     error = None
