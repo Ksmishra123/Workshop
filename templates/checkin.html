@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
 <title>OSA Check-In Kiosk</title>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/jsqr/1.4.0/jsQR.min.js"></script>
+<script src="https://unpkg.com/@zxing/browser@0.1.1/umd/index.min.js"></script>
 <style>
   *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
   :root {
@@ -379,42 +379,34 @@
     cd.textContent = `Returning to scan screen in ${s}s…`;
   }
 
-  // ── CAMERA ──
+  // ── CAMERA (ZXing) ──
+  let zxingReader = null;
+
   async function toggleCam() { camActive ? stopCam() : await startCam(); }
 
   async function startCam() {
-    const btn = document.getElementById('cam-btn');
+    const btn  = document.getElementById('cam-btn');
     const wrap = document.getElementById('video-wrap');
     const video = document.getElementById('qr-video');
     try {
-      // Try rear camera first, fall back to any camera
-      try {
-        camStream = await navigator.mediaDevices.getUserMedia({
-          video: { facingMode: { exact: 'environment' } }
-        });
-      } catch(e) {
-        camStream = await navigator.mediaDevices.getUserMedia({ video: true });
-      }
-      video.srcObject = camStream;
-      await video.play();
+      zxingReader = new ZXingBrowser.BrowserMultiFormatReader();
+      const devices = await ZXingBrowser.BrowserCodeReader.listVideoInputDevices();
+      // Prefer rear camera
+      const device = devices.find(d => /back|rear|environment/i.test(d.label)) || devices[devices.length - 1];
+      const deviceId = device ? device.deviceId : undefined;
+
       wrap.style.display = 'block';
       camActive = true;
       btn.textContent = '✕ Stop Camera';
       btn.classList.add('active');
-      const canvas = document.createElement('canvas');
-      const ctx    = canvas.getContext('2d', { willReadFrequently: true });
+
       let lastCode = '';
-      function scanFrame() {
-        if (!camActive) return;
-        if (video.readyState === video.HAVE_ENOUGH_DATA && video.videoWidth > 0) {
-          canvas.width  = video.videoWidth;
-          canvas.height = video.videoHeight;
-          ctx.drawImage(video, 0, 0);
-          const img  = ctx.getImageData(0, 0, canvas.width, canvas.height);
-          const code = jsQR(img.data, img.width, img.height, { inversionAttempts: 'attemptBoth' });
-          if (code && code.data && code.data !== lastCode) {
-            lastCode = code.data;
-            let sid = code.data.trim();
+      await zxingReader.decodeFromVideoDevice(deviceId, video, (result, err) => {
+        if (result) {
+          const text = result.getText();
+          if (text && text !== lastCode) {
+            lastCode = text;
+            let sid = text.trim();
             if (sid.includes('/confirm/')) sid = sid.split('/confirm/').pop().split('/')[0];
             else if (sid.toUpperCase().startsWith('CHECKIN:')) sid = sid.split(':')[1];
             document.getElementById('id-input').value = sid;
@@ -422,18 +414,16 @@
             setTimeout(() => { lastCode = ''; }, 4000);
           }
         }
-        camRaf = requestAnimationFrame(scanFrame);
-      }
-      camRaf = requestAnimationFrame(scanFrame);
+      });
     } catch(e) {
       setError('Camera unavailable: ' + (e.message || 'Please check browser permissions.'));
+      stopCam();
     }
   }
 
   function stopCam() {
     camActive = false;
-    if (camRaf)    cancelAnimationFrame(camRaf);
-    if (camStream) camStream.getTracks().forEach(t => t.stop());
+    if (zxingReader) { zxingReader.reset(); zxingReader = null; }
     const btn  = document.getElementById('cam-btn');
     const wrap = document.getElementById('video-wrap');
     if (btn)  { btn.textContent = '📷 Start Camera'; btn.classList.remove('active'); }
