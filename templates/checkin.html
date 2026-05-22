@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
 <title>OSA Check-In Kiosk</title>
-<script src="https://unpkg.com/@zxing/browser@0.1.1/umd/index.min.js"></script>
+<script src="https://unpkg.com/@zxing/library@0.19.1/umd/index.min.js"></script>
 <style>
   *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
   :root {
@@ -385,13 +385,13 @@
   async function toggleCam() { camActive ? stopCam() : await startCam(); }
 
   async function startCam() {
-    const btn  = document.getElementById('cam-btn');
-    const wrap = document.getElementById('video-wrap');
+    const btn   = document.getElementById('cam-btn');
+    const wrap  = document.getElementById('video-wrap');
     const video = document.getElementById('qr-video');
     try {
-      zxingReader = new ZXingBrowser.BrowserMultiFormatReader();
-      const devices = await ZXingBrowser.BrowserCodeReader.listVideoInputDevices();
-      // Prefer rear camera
+      zxingReader = new ZXing.BrowserMultiFormatReader();
+      const devices = await ZXing.BrowserMultiFormatReader.listVideoInputDevices();
+      // Prefer rear/environment camera on mobile
       const device = devices.find(d => /back|rear|environment/i.test(d.label)) || devices[devices.length - 1];
       const deviceId = device ? device.deviceId : undefined;
 
@@ -401,7 +401,7 @@
       btn.classList.add('active');
 
       let lastCode = '';
-      await zxingReader.decodeFromVideoDevice(deviceId, video, (result, err) => {
+      zxingReader.decodeFromVideoDevice(deviceId, video, (result, err) => {
         if (result) {
           const text = result.getText();
           if (text && text !== lastCode) {
