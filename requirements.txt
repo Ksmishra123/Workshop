@@ -5,4 +5,4 @@ sendgrid==6.11.0
 squareup==44.1.0.20260520
 gunicorn==22.0.0
 Pillow==10.4.0
-psycopg[binary]==3.2.4
+psycopg[binary]==3.3.4
