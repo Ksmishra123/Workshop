@@ -1,0 +1,87 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN">
+<html>
+<head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1.0"><title>OSA Workshop Confirmation</title></head>
+<body style="margin:0;padding:0;background-color:#F2EFE8;font-family:Arial,Helvetica,sans-serif;">
+<table width="100%" cellpadding="0" cellspacing="0" border="0" style="background-color:#F2EFE8;padding:32px 0 64px;">
+  <tr><td align="center">
+    <table width="600" cellpadding="0" cellspacing="0" border="0" style="max-width:600px;width:100%;">
+      <tr><td style="background-color:#1E3A0F;border-radius:16px 16px 0 0;padding:32px 36px 0;">
+        <p style="margin:0 0 10px;font-family:Arial,Helvetica,sans-serif;font-size:10px;font-weight:bold;letter-spacing:0.16em;text-transform:uppercase;color:#C9A84C;">On Stage America</p>
+        <p style="margin:0 0 6px;font-family:Georgia,'Times New Roman',serif;font-size:36px;font-weight:normal;color:#ffffff;line-height:1.1;">You're Registered!</p>
+        <p style="margin:0 0 16px;font-family:Arial,Helvetica,sans-serif;font-size:14px;color:rgba(255,255,255,0.5);">Workshop Registration Confirmed</p>
+        <table cellpadding="0" cellspacing="0" border="0" style="margin-bottom:28px;"><tr>
+          <td style="background-color:rgba(255,255,255,0.1);border:1px solid rgba(255,255,255,0.15);border-radius:100px;padding:6px 14px;">
+            <table cellpadding="0" cellspacing="0" border="0"><tr>
+              <td style="width:8px;height:8px;background-color:#6FCF3A;border-radius:50%;vertical-align:middle;">&nbsp;</td>
+              <td style="font-family:Arial,Helvetica,sans-serif;font-size:13px;color:rgba(255,255,255,0.85);padding-left:8px;vertical-align:middle;">
+                {% if reg.is_title %}⭐ Title Registrant — No Charge{% else %}Registration &amp; Payment Confirmed{% endif %}
+              </td>
+            </tr></table>
+          </td>
+        </tr></table>
+      </td></tr>
+      <tr><td style="background:linear-gradient(90deg,#C9A84C 0%,#4A7A26 50%,#C9A84C 100%);height:3px;font-size:0;">&nbsp;</td></tr>
+      <tr><td style="background-color:#ffffff;padding:36px;">
+        <p style="margin:0 0 10px;font-family:Georgia,'Times New Roman',serif;font-size:22px;color:#1A1814;">Hi {{ reg.first_name }},</p>
+        <p style="margin:0 0 24px;font-family:Arial,Helvetica,sans-serif;font-size:14px;color:#5A5750;line-height:1.75;">
+          {% if reg.is_title %}Your workshop registration has been confirmed as a Title registrant. No payment is required. Your QR check-in code is below.
+          {% else %}Your registration and payment have been confirmed. Your QR check-in code is below — show it at the check-in desk on event day.{% endif %}
+        </p>
+
+        <!-- Details -->
+        <table width="100%" cellpadding="0" cellspacing="0" border="0" style="border:1px solid #DDD9D0;border-radius:12px;overflow:hidden;margin-bottom:24px;">
+          <tr><td colspan="2" style="background:#F4F8EE;border-bottom:1px solid #DDD9D0;padding:11px 18px;font-family:Arial,Helvetica,sans-serif;font-size:11px;font-weight:bold;letter-spacing:0.08em;text-transform:uppercase;color:#2D5016;">Registration Details</td></tr>
+          <tr><td style="font-family:Arial,Helvetica,sans-serif;font-size:11px;font-weight:bold;color:#8A8780;text-transform:uppercase;letter-spacing:0.04em;padding:10px 18px;border-bottom:1px solid #F0EDE6;width:120px;vertical-align:top;">Student</td><td style="font-family:Arial,Helvetica,sans-serif;font-size:14px;font-weight:500;color:#1A1814;padding:10px 18px;border-bottom:1px solid #F0EDE6;">{{ reg.full_name }}</td></tr>
+          <tr><td style="font-family:Arial,Helvetica,sans-serif;font-size:11px;font-weight:bold;color:#8A8780;text-transform:uppercase;letter-spacing:0.04em;padding:10px 18px;border-bottom:1px solid #F0EDE6;width:120px;vertical-align:top;">Studio</td><td style="font-family:Arial,Helvetica,sans-serif;font-size:14px;font-weight:500;color:#1A1814;padding:10px 18px;border-bottom:1px solid #F0EDE6;">{{ reg.studio_name }}</td></tr>
+          <tr><td style="font-family:Arial,Helvetica,sans-serif;font-size:11px;font-weight:bold;color:#8A8780;text-transform:uppercase;letter-spacing:0.04em;padding:10px 18px;border-bottom:1px solid #F0EDE6;width:120px;vertical-align:top;">Registration</td><td style="padding:10px 18px;border-bottom:1px solid #F0EDE6;"><span style="display:inline-block;background-color:#EBF3E0;color:#2D5016;border:1px solid #C0D9A0;border-radius:100px;padding:3px 10px;font-family:Arial,Helvetica,sans-serif;font-size:12px;font-weight:bold;">{{ reg.reg_label }}</span></td></tr>
+          {% if reg.is_title and reg.routine_name %}<tr><td style="font-family:Arial,Helvetica,sans-serif;font-size:11px;font-weight:bold;color:#8A8780;text-transform:uppercase;letter-spacing:0.04em;padding:10px 18px;border-bottom:1px solid #F0EDE6;width:120px;vertical-align:top;">Routine</td><td style="font-family:Arial,Helvetica,sans-serif;font-size:14px;font-weight:500;color:#1A1814;padding:10px 18px;border-bottom:1px solid #F0EDE6;">{{ reg.routine_name }}</td></tr>{% endif %}
+          {% if reg.tshirt_size %}<tr><td style="font-family:Arial,Helvetica,sans-serif;font-size:11px;font-weight:bold;color:#8A8780;text-transform:uppercase;letter-spacing:0.04em;padding:10px 18px;border-bottom:1px solid #F0EDE6;width:120px;vertical-align:top;">T-Shirt</td><td style="font-family:Arial,Helvetica,sans-serif;font-size:14px;font-weight:500;color:#1A1814;padding:10px 18px;border-bottom:1px solid #F0EDE6;">{{ reg.tshirt_size }}</td></tr>{% endif %}
+          <tr><td style="font-family:Arial,Helvetica,sans-serif;font-size:11px;font-weight:bold;color:#8A8780;text-transform:uppercase;letter-spacing:0.04em;padding:10px 18px;border-bottom:1px solid #F0EDE6;width:120px;vertical-align:top;">Amount</td><td style="font-family:Arial,Helvetica,sans-serif;font-size:14px;font-weight:bold;color:{% if reg.is_title %}#4A7A26{% else %}#1A1814{% endif %};padding:10px 18px;border-bottom:1px solid #F0EDE6;">{{ reg.amount_display }}</td></tr>
+          <tr><td style="font-family:Arial,Helvetica,sans-serif;font-size:11px;font-weight:bold;color:#8A8780;text-transform:uppercase;letter-spacing:0.04em;padding:10px 18px;width:120px;vertical-align:top;">Confirmation #</td><td style="padding:10px 18px;"><span style="font-family:'Courier New',Courier,monospace;font-size:13px;background-color:#EBF3E0;color:#2D5016;padding:2px 8px;border-radius:4px;">{{ reg.id }}</span></td></tr>
+        </table>
+
+        <!-- QR CODE — embedded as base64, works in all email clients -->
+        <table width="100%" cellpadding="0" cellspacing="0" border="0" style="border:1.5px dashed #C8C4BC;border-radius:12px;margin-bottom:24px;">
+          <tr><td style="padding:28px 24px;text-align:center;">
+            <p style="margin:0 0 4px;font-family:Arial,Helvetica,sans-serif;font-size:10px;font-weight:bold;letter-spacing:0.12em;text-transform:uppercase;color:#8A8780;">Your Check-In Pass</p>
+            <p style="margin:0 0 6px;font-family:Georgia,'Times New Roman',serif;font-size:20px;color:#1A1814;">Scan to Check In at the Event</p>
+            <p style="margin:0 0 18px;font-family:Arial,Helvetica,sans-serif;font-size:13px;color:#5A5750;line-height:1.6;">Screenshot or print this email and show this QR code<br/>at the check-in desk when you arrive.</p>
+            <table cellpadding="0" cellspacing="0" border="0" style="margin:0 auto 12px;">
+              <tr><td style="background:#fff;border:1px solid #DDD9D0;border-radius:10px;padding:14px;">
+                <!-- QR code embedded as base64 PNG — no external requests, works everywhere -->
+                <img src="data:image/png;base64,{{ qr_inline }}" width="180" height="180" alt="Check-in QR Code" style="display:block;border-radius:4px;">
+              </td></tr>
+            </table>
+            <p style="margin:0;font-family:'Courier New',Courier,monospace;font-size:11px;color:#8A8780;">Ref # {{ reg.id }}</p>
+          </td></tr>
+        </table>
+
+        <!-- View confirmation page link -->
+        <table width="100%" cellpadding="0" cellspacing="0" border="0" style="margin-bottom:24px;">
+          <tr><td style="text-align:center;">
+            <a href="{{ confirmation_url }}" style="display:inline-block;background-color:#2D5016;color:#ffffff;padding:12px 24px;border-radius:8px;font-family:Arial,Helvetica,sans-serif;font-size:14px;font-weight:bold;text-decoration:none;">View Confirmation Page ↗</a>
+          </td></tr>
+        </table>
+
+        <!-- Steps -->
+        <p style="margin:0 0 12px;font-family:Arial,Helvetica,sans-serif;font-size:11px;font-weight:bold;letter-spacing:0.08em;text-transform:uppercase;color:#8A8780;">On Event Day</p>
+        <table width="100%" cellpadding="0" cellspacing="0" border="0" style="margin-bottom:10px;"><tr><td style="width:28px;vertical-align:top;"><table cellpadding="0" cellspacing="0"><tr><td style="width:24px;height:24px;background-color:#1E3A0F;border-radius:50%;font-family:Arial,Helvetica,sans-serif;font-size:11px;font-weight:bold;color:#fff;text-align:center;line-height:24px;vertical-align:middle;">1</td></tr></table></td><td style="font-family:Arial,Helvetica,sans-serif;font-size:14px;color:#5A5750;line-height:1.6;padding-left:12px;">Save or screenshot this email — the QR code is embedded and always works.</td></tr></table>
+        <table width="100%" cellpadding="0" cellspacing="0" border="0" style="margin-bottom:10px;"><tr><td style="width:28px;vertical-align:top;"><table cellpadding="0" cellspacing="0"><tr><td style="width:24px;height:24px;background-color:#1E3A0F;border-radius:50%;font-family:Arial,Helvetica,sans-serif;font-size:11px;font-weight:bold;color:#fff;text-align:center;line-height:24px;vertical-align:middle;">2</td></tr></table></td><td style="font-family:Arial,Helvetica,sans-serif;font-size:14px;color:#5A5750;line-height:1.6;padding-left:12px;">Arrive at the venue and head to the check-in desk.</td></tr></table>
+        <table width="100%" cellpadding="0" cellspacing="0" border="0" style="margin-bottom:24px;"><tr><td style="width:28px;vertical-align:top;"><table cellpadding="0" cellspacing="0"><tr><td style="width:24px;height:24px;background-color:#1E3A0F;border-radius:50%;font-family:Arial,Helvetica,sans-serif;font-size:11px;font-weight:bold;color:#fff;text-align:center;line-height:24px;vertical-align:middle;">3</td></tr></table></td><td style="font-family:Arial,Helvetica,sans-serif;font-size:14px;color:#5A5750;line-height:1.6;padding-left:12px;">Show your QR code to staff. They&rsquo;ll scan it and you&rsquo;re checked in instantly.</td></tr></table>
+
+        <table width="100%" cellpadding="0" cellspacing="0" border="0"><tr>
+          <td style="background-color:#F4F8EE;border:1px solid #C8D9B4;border-radius:10px;padding:16px 18px;">
+            <p style="margin:0 0 2px;font-family:Arial,Helvetica,sans-serif;font-size:13px;font-weight:bold;color:#2D5016;">Questions? We&rsquo;re here.</p>
+            <p style="margin:0;font-family:Arial,Helvetica,sans-serif;font-size:13px;color:#3A5A20;line-height:1.7;">Email <a href="mailto:osa@onstageamerica.com" style="color:#2D5016;font-weight:bold;text-decoration:none;">osa@onstageamerica.com</a> or call <a href="tel:3016548939" style="color:#2D5016;font-weight:bold;text-decoration:none;">301-654-8939</a></p>
+          </td>
+        </tr></table>
+      </td></tr>
+      <tr><td style="background-color:#1A1814;border-radius:0 0 16px 16px;padding:24px 36px;text-align:center;">
+        <p style="margin:0 0 6px;font-family:Georgia,'Times New Roman',serif;font-size:18px;color:rgba(255,255,255,0.8);">On Stage America</p>
+        <p style="margin:0;font-family:Arial,Helvetica,sans-serif;font-size:12px;color:rgba(255,255,255,0.3);line-height:1.9;">9603 Meadow Flowers Ct. &middot; Laurel, MD 20723<br/>osa@onstageamerica.com &middot; 301-654-8939</p>
+      </td></tr>
+    </table>
+  </td></tr>
+</table>
+</body>
+</html>

@@ -1,0 +1,210 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>OSA Admin Dashboard</title>
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  :root {
+    --forest:#1E3A0F;--green:#2D5016;--green-mid:#4A7A26;
+    --green-light:#EBF3E0;--gold:#C9A84C;
+    --text:#1A1814;--muted:#5A5750;--light:#8A8780;
+    --border:#DDD9D0;--bg:#F2EFE8;--surface:#fff;--surface2:#F4F1EB;
+    --success:#1A5A2A;--success-light:#E8F5EC;--success-border:#B8DCC4;
+    --warn:#7A4A00;--warn-light:#FFF3DC;
+    --radius:10px;--radius-lg:16px;
+    --shadow:0 1px 4px rgba(0,0,0,0.07);
+  }
+  body { font-family: Arial, Helvetica, sans-serif; background: var(--bg); color: var(--text); min-height: 100vh; -webkit-font-smoothing: antialiased; }
+  .topbar { background: var(--forest); padding: 0 24px; height: 52px; display: flex; align-items: center; gap: 14px; position: sticky; top: 0; z-index: 50; }
+  .topbar-logo { font-size: 10px; font-weight: 700; letter-spacing: 0.14em; text-transform: uppercase; color: var(--gold); }
+  .topbar-title { font-size: 14px; color: rgba(255,255,255,0.6); }
+  .topbar-right { margin-left: auto; display: flex; gap: 10px; }
+  .topbar-btn { background: rgba(255,255,255,0.1); border: 1px solid rgba(255,255,255,0.15); color: rgba(255,255,255,0.8); padding: 6px 14px; border-radius: 6px; font-size: 13px; cursor: pointer; text-decoration: none; font-family: Arial, sans-serif; }
+  .topbar-btn:hover { background: rgba(255,255,255,0.2); }
+  .topbar-btn.primary { background: var(--gold); border-color: var(--gold); color: #1A1814; font-weight: 700; }
+  .stripe { height: 3px; background: linear-gradient(90deg,var(--gold) 0%,var(--green-mid) 50%,var(--gold) 100%); }
+  .main { padding: 28px; }
+
+  /* Stats */
+  .stats-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 14px; margin-bottom: 28px; }
+  .stat-card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-lg); padding: 20px 22px; box-shadow: var(--shadow); }
+  .stat-label { font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.08em; color: var(--light); margin-bottom: 6px; }
+  .stat-val { font-size: 32px; font-weight: 700; font-family: 'Courier New', monospace; line-height: 1; }
+  .stat-val.green { color: var(--green-mid); }
+  .stat-val.gold { color: var(--gold); }
+  .stat-val.blue { color: #4A5080; }
+
+  /* Search & filter */
+  .toolbar { display: flex; gap: 12px; margin-bottom: 18px; flex-wrap: wrap; align-items: center; }
+  .search-input { flex: 1; min-width: 200px; padding: 10px 14px; border: 1px solid var(--border); border-radius: var(--radius); font-size: 14px; font-family: Arial, sans-serif; outline: none; background: var(--surface); }
+  .search-input:focus { border-color: var(--green-mid); }
+  .filter-select { padding: 10px 14px; border: 1px solid var(--border); border-radius: var(--radius); font-size: 14px; font-family: Arial, sans-serif; background: var(--surface); outline: none; }
+
+  /* Table */
+  .table-wrap { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-lg); overflow: hidden; box-shadow: var(--shadow); }
+  table { width: 100%; border-collapse: collapse; }
+  thead { background: var(--forest); }
+  thead th { padding: 12px 14px; font-size: 11px; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; color: rgba(255,255,255,0.7); text-align: left; white-space: nowrap; }
+  tbody tr { border-bottom: 1px solid var(--border); transition: background 0.1s; }
+  tbody tr:last-child { border-bottom: none; }
+  tbody tr:hover { background: var(--surface2); }
+  tbody td { padding: 12px 14px; font-size: 13px; vertical-align: middle; }
+  .badge { display: inline-block; padding: 3px 8px; border-radius: 100px; font-size: 11px; font-weight: 700; white-space: nowrap; }
+  .badge.title { background: #FBF5E6; color: #8A6200; border: 1px solid #E8D498; }
+  .badge.workshop { background: var(--green-light); color: var(--green); border: 1px solid #C0D9A0; }
+  .badge.opening { background: #EEF0F8; color: #4A5080; border: 1px solid #C8CCDC; }
+  .badge.both { background: #F0E8F8; color: #6A3080; border: 1px solid #D0B0E8; }
+  .badge.paid { background: var(--success-light); color: var(--success); border: 1px solid var(--success-border); }
+  .badge.free { background: var(--green-light); color: var(--green-mid); border: 1px solid #C0D9A0; }
+  .badge.pending { background: var(--warn-light); color: var(--warn); border: 1px solid #EDD8A0; }
+  .badge.in { background: var(--success-light); color: var(--success); border: 1px solid var(--success-border); }
+  .badge.out { background: var(--surface2); color: var(--light); border: 1px solid var(--border); }
+  .mono { font-family: 'Courier New', monospace; font-size: 11px; color: var(--light); }
+  .empty { text-align: center; padding: 48px; color: var(--muted); font-size: 14px; }
+
+  @media (max-width: 768px) {
+    .stats-grid { grid-template-columns: repeat(2, 1fr); }
+    .main { padding: 16px; }
+    table { font-size: 12px; }
+    thead th, tbody td { padding: 10px 10px; }
+  }
+</style>
+</head>
+<body>
+
+<div class="topbar">
+  <div class="topbar-logo">On Stage America</div>
+  <span style="color:rgba(255,255,255,0.2);">/</span>
+  <div class="topbar-title">Admin Dashboard</div>
+  <div class="topbar-right">
+    <a href="/checkin" class="topbar-btn">Check-In Kiosk</a>
+    <a href="/register" class="topbar-btn">Registration Form</a>
+    <a href="/admin/export" class="topbar-btn primary">⬇ Export CSV</a>
+    <a href="/admin/logout" class="topbar-btn">Sign Out</a>
+  </div>
+</div>
+<div class="stripe"></div>
+
+<div class="main">
+
+  <!-- STATS -->
+  <div class="stats-grid">
+    <div class="stat-card">
+      <div class="stat-label">Total Registered</div>
+      <div class="stat-val">{{ total }}</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-label">Checked In</div>
+      <div class="stat-val green">{{ checked }}</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-label">Title Registrants</div>
+      <div class="stat-val blue">{{ title }}</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-label">Revenue Collected</div>
+      <div class="stat-val gold">${{ '%.2f' | format(revenue / 100) }}</div>
+    </div>
+  </div>
+
+  <!-- TOOLBAR -->
+  <div class="toolbar">
+    <input type="text" class="search-input" id="search" placeholder="Search by name, studio, email…" oninput="filterTable()">
+    <select class="filter-select" id="filter-reg" onchange="filterTable()">
+      <option value="">All Registration Types</option>
+      <option value="title">Title Registrant</option>
+      <option value="workshop">Workshop Only</option>
+      <option value="opening">Opening Number Only</option>
+      <option value="both">Both Workshop & Opening</option>
+    </select>
+    <select class="filter-select" id="filter-checkin" onchange="filterTable()">
+      <option value="">All Check-In Status</option>
+      <option value="in">Checked In</option>
+      <option value="out">Not Checked In</option>
+    </select>
+  </div>
+
+  <!-- TABLE -->
+  <div class="table-wrap">
+    {% if regs %}
+    <table id="reg-table">
+      <thead>
+        <tr>
+          <th>Student</th>
+          <th>Studio</th>
+          <th>Registration</th>
+          <th>T-Shirt</th>
+          <th>Amount</th>
+          <th>Payment</th>
+          <th>Check-In</th>
+          <th>Check-In Time</th>
+          <th>Registered</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for r in regs %}
+        <tr
+          data-name="{{ r.full_name | lower }}"
+          data-studio="{{ r.studio_name | lower }}"
+          data-email="{{ r.email | lower }}"
+          data-reg="{{ r.reg_type or 'title' if r.is_title else r.reg_type }}"
+          data-checkin="{{ 'in' if r.checked_in else 'out' }}">
+          <td>
+            <div style="font-weight:600;">{{ r.full_name }}</div>
+            <div style="font-size:11px;color:var(--light);">{{ r.email }}</div>
+          </td>
+          <td>{{ r.studio_name }}</td>
+          <td>
+            {% if r.is_title %}
+              <span class="badge title">⭐ Title</span>
+            {% elif r.reg_type == 'both' %}
+              <span class="badge both">Workshop & Opening</span>
+            {% elif r.reg_type == 'opening' %}
+              <span class="badge opening">Opening Only</span>
+            {% else %}
+              <span class="badge workshop">Workshop Only</span>
+            {% endif %}
+          </td>
+          <td>{{ r.tshirt_size or '—' }}</td>
+          <td>${{ '%.2f' | format(r.amount / 100) }}</td>
+          <td>
+            {% if r.payment_status == 'paid' %}<span class="badge paid">Paid</span>
+            {% elif r.payment_status == 'free' %}<span class="badge free">Free</span>
+            {% else %}<span class="badge pending">Pending</span>{% endif %}
+          </td>
+          <td>
+            {% if r.checked_in %}<span class="badge in">✓ In</span>
+            {% else %}<span class="badge out">Pending</span>{% endif %}
+          </td>
+          <td class="mono">
+            {% if r.checkin_time %}{{ r.checkin_time.strftime('%I:%M %p') }}{% else %}—{% endif %}
+          </td>
+          <td class="mono">{{ r.created_at.strftime('%m/%d/%Y') }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+    {% else %}
+    <div class="empty">No registrations yet.</div>
+    {% endif %}
+  </div>
+
+</div>
+
+<script>
+  function filterTable() {
+    const q   = document.getElementById('search').value.toLowerCase();
+    const reg = document.getElementById('filter-reg').value;
+    const ci  = document.getElementById('filter-checkin').value;
+    document.querySelectorAll('#reg-table tbody tr').forEach(row => {
+      const matchQ   = !q   || row.dataset.name.includes(q) || row.dataset.studio.includes(q) || row.dataset.email.includes(q);
+      const matchReg = !reg || row.dataset.reg === reg;
+      const matchCi  = !ci  || row.dataset.checkin === ci;
+      row.style.display = (matchQ && matchReg && matchCi) ? '' : 'none';
+    });
+  }
+</script>
+</body>
+</html>

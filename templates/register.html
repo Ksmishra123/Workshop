@@ -1,0 +1,402 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>OSA Workshop Registration</title>
+<script src="https://sandbox.web.squarecdn.com/v1/square.js"></script>
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  :root {
+    --forest:#1E3A0F; --green:#2D5016; --green-mid:#4A7A26;
+    --green-light:#EBF3E0; --gold:#C9A84C;
+    --text:#1A1814; --muted:#5A5750; --light:#8A8780;
+    --border:#DDD9D0; --bg:#F2EFE8; --surface:#fff;
+    --danger:#7A1A1A; --danger-light:#FCEAEA;
+    --radius:10px; --radius-lg:16px;
+  }
+  body { font-family: Arial, Helvetica, sans-serif; background: var(--bg); color: var(--text); padding: 32px 16px 64px; -webkit-font-smoothing: antialiased; }
+  .wrap { max-width: 640px; margin: 0 auto; }
+
+  /* Header */
+  .page-header { background: var(--forest); border-radius: var(--radius-lg) var(--radius-lg) 0 0; padding: 32px 36px 28px; }
+  .page-header-eyebrow { font-size: 10px; font-weight: 700; letter-spacing: 0.16em; text-transform: uppercase; color: var(--gold); margin-bottom: 10px; }
+  .page-header-title { font-family: Georgia, serif; font-size: 36px; color: #fff; line-height: 1.1; margin-bottom: 6px; }
+  .page-header-sub { font-size: 14px; color: rgba(255,255,255,0.5); }
+  .stripe { height: 3px; background: linear-gradient(90deg, var(--gold) 0%, var(--green-mid) 50%, var(--gold) 100%); margin-bottom: 0; }
+
+  /* Form card */
+  .form-card { background: var(--surface); border-radius: 0 0 var(--radius-lg) var(--radius-lg); padding: 32px 36px 36px; box-shadow: 0 4px 24px rgba(0,0,0,0.08); }
+  .section-heading { font-size: 11px; font-weight: 700; letter-spacing: 0.1em; text-transform: uppercase; color: var(--light); margin: 28px 0 16px; padding-bottom: 8px; border-bottom: 1px solid var(--border); }
+  .section-heading:first-child { margin-top: 0; }
+
+  /* Grid */
+  .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+  .grid-3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 14px; }
+  .col-span-2 { grid-column: span 2; }
+
+  /* Fields */
+  .field { display: flex; flex-direction: column; gap: 5px; margin-bottom: 14px; }
+  .field:last-child { margin-bottom: 0; }
+  .field label { font-size: 12px; font-weight: 700; color: var(--muted); text-transform: uppercase; letter-spacing: 0.04em; }
+  .field label .req { color: var(--green-mid); margin-left: 2px; }
+  .field input, .field select, .field textarea {
+    padding: 11px 14px; border: 1.5px solid var(--border);
+    border-radius: var(--radius); font-size: 15px;
+    font-family: Arial, Helvetica, sans-serif; color: var(--text);
+    background: var(--surface); outline: none; transition: border-color 0.15s;
+    width: 100%;
+  }
+  .field input:focus, .field select:focus, .field textarea:focus { border-color: var(--green-mid); }
+  .field input::placeholder { color: var(--light); }
+
+  /* Radio group */
+  .radio-group { display: flex; flex-direction: column; gap: 10px; }
+  .radio-option {
+    display: flex; align-items: center; gap: 12px;
+    padding: 14px 16px; border: 1.5px solid var(--border);
+    border-radius: var(--radius); cursor: pointer; transition: all 0.12s;
+  }
+  .radio-option:hover { border-color: var(--green-mid); background: var(--green-light); }
+  .radio-option.selected { border-color: var(--green); background: var(--green-light); }
+  .radio-option input[type=radio] { width: 18px; height: 18px; accent-color: var(--green); flex-shrink: 0; cursor: pointer; }
+  .radio-option-label { font-size: 15px; font-weight: 500; flex: 1; }
+  .radio-option-price { font-size: 14px; font-weight: 700; color: var(--green); }
+  .radio-free { font-size: 14px; font-weight: 700; color: var(--green-mid); }
+
+  /* Yes/No pills */
+  .yesno-group { display: flex; gap: 10px; }
+  .yesno-btn {
+    flex: 1; padding: 12px; border: 1.5px solid var(--border);
+    border-radius: var(--radius); font-size: 15px; font-weight: 600;
+    cursor: pointer; background: var(--surface); color: var(--muted);
+    text-align: center; transition: all 0.12s; user-select: none;
+  }
+  .yesno-btn:hover { border-color: var(--green-mid); color: var(--green); }
+  .yesno-btn.selected { background: var(--green); border-color: var(--green); color: #fff; }
+
+  /* Conditional sections */
+  .conditional { display: none; }
+  .conditional.show { display: block; }
+
+  /* Info box */
+  .info-box { background: var(--green-light); border: 1px solid #C0D9A0; border-radius: var(--radius); padding: 14px 16px; font-size: 14px; color: var(--green); margin-bottom: 14px; line-height: 1.6; }
+  .info-box strong { display: block; margin-bottom: 3px; }
+
+  /* Payment */
+  #square-card-container { border: 1.5px solid var(--border); border-radius: var(--radius); padding: 14px; background: var(--surface); min-height: 60px; }
+  #square-card-container.error { border-color: var(--danger); }
+  .payment-total { display: flex; justify-content: space-between; align-items: center; padding: 14px 0; border-top: 1px solid var(--border); margin-top: 14px; }
+  .payment-total-label { font-size: 14px; color: var(--muted); font-weight: 600; }
+  .payment-total-val { font-size: 22px; font-weight: 700; color: var(--text); }
+
+  /* Submit */
+  .btn-submit {
+    width: 100%; padding: 17px; background: var(--green);
+    color: #fff; border: none; border-radius: var(--radius);
+    font-size: 17px; font-weight: 700; cursor: pointer;
+    transition: background 0.15s; margin-top: 24px;
+    display: flex; align-items: center; justify-content: center; gap: 10px;
+    font-family: Arial, Helvetica, sans-serif;
+  }
+  .btn-submit:hover { background: var(--forest); }
+  .btn-submit:disabled { background: var(--light); cursor: not-allowed; }
+
+  /* Error / spinner */
+  .form-error { background: var(--danger-light); border: 1px solid #E8B4B4; border-radius: var(--radius); padding: 12px 16px; font-size: 14px; color: var(--danger); margin-top: 14px; display: none; }
+  .form-error.show { display: block; }
+  .spinner { display: inline-block; width: 20px; height: 20px; border: 2px solid rgba(255,255,255,0.3); border-top-color: #fff; border-radius: 50%; animation: spin 0.7s linear infinite; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  @media (max-width: 560px) {
+    .grid-2, .grid-3 { grid-template-columns: 1fr; }
+    .col-span-2 { grid-column: span 1; }
+    .form-card, .page-header { padding: 24px 20px; }
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="page-header">
+    <div class="page-header-eyebrow">On Stage America</div>
+    <div class="page-header-title">Workshop Registration</div>
+    <div class="page-header-sub">Complete the form below to register for the workshop</div>
+  </div>
+  <div class="stripe"></div>
+
+  <div class="form-card">
+    <form id="reg-form" onsubmit="return false;">
+
+      <!-- DANCER INFO -->
+      <div class="section-heading">Dancer Information</div>
+      <div class="grid-2">
+        <div class="field">
+          <label>Studio Name <span class="req">*</span></label>
+          <input type="text" name="studio_name" required placeholder="Studio name">
+        </div>
+        <div class="field">
+          <label>Gender <span class="req">*</span></label>
+          <select name="gender" required>
+            <option value="">Select…</option>
+            <option>Female</option><option>Male</option>
+            <option>Non-binary</option><option>Prefer not to say</option>
+          </select>
+        </div>
+      </div>
+      <div class="grid-2">
+        <div class="field">
+          <label>First Name <span class="req">*</span></label>
+          <input type="text" name="first_name" required placeholder="First name">
+        </div>
+        <div class="field">
+          <label>Last Name <span class="req">*</span></label>
+          <input type="text" name="last_name" required placeholder="Last name">
+        </div>
+      </div>
+      <div class="grid-2">
+        <div class="field">
+          <label>Birth Date <span class="req">*</span></label>
+          <input type="date" name="birth_date" required>
+        </div>
+        <div class="field">
+          <label>Email <span class="req">*</span></label>
+          <input type="email" name="email" required placeholder="email@example.com">
+        </div>
+      </div>
+      <div class="grid-3">
+        <div class="field">
+          <label>Phone <span class="req">*</span></label>
+          <input type="tel" name="phone" required placeholder="Phone">
+        </div>
+        <div class="field">
+          <label>Mobile</label>
+          <input type="tel" name="mobile" placeholder="Mobile">
+        </div>
+        <div class="field">
+          <label>Work</label>
+          <input type="tel" name="work" placeholder="Work">
+        </div>
+      </div>
+
+      <!-- REGISTRATION TYPE -->
+      <div class="section-heading">Registration Type</div>
+      <div class="field">
+        <label>Are you registered for Title at this Nationals? <span class="req">*</span></label>
+        <div class="yesno-group" style="margin-top:4px;">
+          <div class="yesno-btn" onclick="setTitle('yes', this)">Yes</div>
+          <div class="yesno-btn" onclick="setTitle('no', this)">No</div>
+        </div>
+        <input type="hidden" name="is_title" id="is_title_val" required>
+      </div>
+
+      <!-- TITLE = YES -->
+      <div class="conditional" id="section-title">
+        <div class="info-box">
+          <strong>Title Registrant — No Charge</strong>
+          Your fee has been covered through the Title registration system. Please provide your routine name to complete registration.
+        </div>
+        <div class="field">
+          <label>Name of Routine Entered for Title <span class="req">*</span></label>
+          <input type="text" name="routine_name" id="routine_name" placeholder="Routine name">
+        </div>
+      </div>
+
+      <!-- TITLE = NO -->
+      <div class="conditional" id="section-nontitle">
+        <div class="field">
+          <label>Please select your registration <span class="req">*</span></label>
+          <div class="radio-group" style="margin-top:4px;">
+            <label class="radio-option" onclick="selectReg(this,'workshop')">
+              <input type="radio" name="reg_type" value="workshop">
+              <span class="radio-option-label">Workshop Only</span>
+              <span class="radio-option-price">$75.00</span>
+            </label>
+            <label class="radio-option" onclick="selectReg(this,'opening')">
+              <input type="radio" name="reg_type" value="opening">
+              <span class="radio-option-label">Opening Number Only</span>
+              <span class="radio-option-price">$150.00</span>
+            </label>
+            <label class="radio-option" onclick="selectReg(this,'both')">
+              <input type="radio" name="reg_type" value="both">
+              <span class="radio-option-label">Both Workshop &amp; Opening Number</span>
+              <span class="radio-option-price">$225.00</span>
+            </label>
+          </div>
+        </div>
+      </div>
+
+      <!-- T-SHIRT (opening / both / title) -->
+      <div class="conditional" id="section-tshirt">
+        <div class="section-heading">T-Shirt</div>
+        <div class="field" style="max-width:280px;">
+          <label>T-Shirt Size <span class="req">*</span></label>
+          <select name="tshirt_size" id="tshirt_size">
+            <option value="">Select size…</option>
+            <option>Youth Small</option><option>Youth Medium</option><option>Youth Large</option>
+            <option>Adult Small</option><option>Adult Medium</option><option>Adult Large</option>
+            <option>Adult XL</option><option>Adult 2XL</option>
+          </select>
+        </div>
+      </div>
+
+      <!-- PAYMENT -->
+      <div class="conditional" id="section-payment">
+        <div class="section-heading">Payment</div>
+        <div id="square-card-container"></div>
+        <div class="payment-total">
+          <div class="payment-total-label">Total Due</div>
+          <div class="payment-total-val" id="payment-total-display">$0.00</div>
+        </div>
+      </div>
+
+      <div class="form-error" id="form-error"></div>
+
+      <button type="button" class="btn-submit" id="submit-btn" onclick="submitForm()" disabled>
+        Complete Registration
+      </button>
+
+    </form>
+  </div>
+</div>
+
+<script>
+  const PRICES = { workshop: 75, opening: 150, both: 225 };
+  let currentTitle = null;
+  let currentReg   = null;
+  let squareCard   = null;
+  let squarePayments = null;
+
+  // Square init
+  async function initSquare() {
+    if (!window.Square) return;
+    const appId     = '{{ sq_app_id }}';
+    const locationId= '{{ sq_location }}';
+    if (!appId || appId === '') return;
+    squarePayments = window.Square.payments(appId, locationId);
+    squareCard     = await squarePayments.card();
+    await squareCard.attach('#square-card-container');
+  }
+
+  function setTitle(val, el) {
+    currentTitle = val;
+    document.getElementById('is_title_val').value = val;
+    document.querySelectorAll('.yesno-btn').forEach(b => b.classList.remove('selected'));
+    el.classList.add('selected');
+    document.getElementById('section-title').classList.toggle('show', val === 'yes');
+    document.getElementById('section-nontitle').classList.toggle('show', val === 'no');
+    if (val === 'yes') {
+      document.getElementById('section-tshirt').classList.add('show');
+      document.getElementById('section-payment').classList.remove('show');
+      document.getElementById('tshirt_size').required = true;
+      document.getElementById('routine_name').required = true;
+      currentReg = null;
+    } else {
+      document.getElementById('section-tshirt').classList.remove('show');
+      document.getElementById('section-payment').classList.remove('show');
+      document.getElementById('tshirt_size').required = false;
+      document.getElementById('routine_name').required = false;
+    }
+    updateTotal();
+    checkReady();
+  }
+
+  function selectReg(el, type) {
+    currentReg = type;
+    document.querySelectorAll('.radio-option').forEach(o => o.classList.remove('selected'));
+    el.classList.add('selected');
+    const needsShirt = type === 'opening' || type === 'both';
+    document.getElementById('section-tshirt').classList.toggle('show', needsShirt);
+    document.getElementById('tshirt_size').required = needsShirt;
+    document.getElementById('section-payment').classList.add('show');
+    updateTotal();
+    if (!squareCard) initSquare();
+    checkReady();
+  }
+
+  function updateTotal() {
+    let amt = 0;
+    if (currentTitle === 'yes') amt = 0;
+    else if (currentReg) amt = PRICES[currentReg] || 0;
+    document.getElementById('payment-total-display').textContent =
+      amt === 0 ? '$0.00' : `$${amt}.00`;
+  }
+
+  function checkReady() {
+    const ready = currentTitle !== null && (
+      currentTitle === 'yes' || currentReg !== null
+    );
+    document.getElementById('submit-btn').disabled = !ready;
+  }
+
+  async function submitForm() {
+    const btn = document.getElementById('submit-btn');
+    const err = document.getElementById('form-error');
+    err.classList.remove('show');
+    btn.disabled = true;
+    btn.innerHTML = '<span class="spinner"></span> Processing…';
+
+    const form = document.getElementById('reg-form');
+    const fd   = new FormData(form);
+    const data = Object.fromEntries(fd.entries());
+
+    // Validate required fields
+    const required = ['studio_name','first_name','last_name','gender','birth_date','email','phone'];
+    for (const f of required) {
+      if (!data[f]) {
+        showError(`Please fill in all required fields.`);
+        resetBtn(); return;
+      }
+    }
+    if (!data.is_title) { showError('Please select Yes or No for Title registration.'); resetBtn(); return; }
+    if (data.is_title === 'yes' && !data.routine_name) { showError('Please enter your routine name.'); resetBtn(); return; }
+    if (data.is_title === 'no' && !data.reg_type) { showError('Please select a registration type.'); resetBtn(); return; }
+
+    // Tokenize payment if needed
+    if (data.is_title === 'no' && squareCard) {
+      const result = await squareCard.tokenize();
+      if (result.status !== 'OK') {
+        showError('Payment error: ' + (result.errors?.[0]?.message || 'Invalid card details'));
+        resetBtn(); return;
+      }
+      data.payment_token = result.token;
+    }
+
+    try {
+      const res  = await fetch('/register/submit', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(data)
+      });
+      const json = await res.json();
+      if (json.success) {
+        window.location.href = `/confirm/${json.id}`;
+      } else {
+        showError(json.error || 'Registration failed. Please try again.');
+        resetBtn();
+      }
+    } catch(e) {
+      showError('Network error. Please try again.');
+      resetBtn();
+    }
+  }
+
+  function showError(msg) {
+    const el = document.getElementById('form-error');
+    el.textContent = msg; el.classList.add('show');
+  }
+  function resetBtn() {
+    const btn = document.getElementById('submit-btn');
+    btn.disabled = false;
+    btn.innerHTML = 'Complete Registration';
+  }
+
+  // Style radio options
+  document.querySelectorAll('.radio-option input').forEach(r => {
+    r.addEventListener('change', () => {
+      document.querySelectorAll('.radio-option').forEach(o => o.classList.remove('selected'));
+      r.closest('.radio-option').classList.add('selected');
+    });
+  });
+</script>
+</body>
+</html>

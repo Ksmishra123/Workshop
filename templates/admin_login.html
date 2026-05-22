@@ -1,0 +1,33 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>OSA Admin Login</title>
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: Arial, Helvetica, sans-serif; background: #F2EFE8; display: flex; align-items: center; justify-content: center; min-height: 100vh; padding: 20px; }
+  .card { background: #fff; border-radius: 16px; padding: 40px 36px; width: 100%; max-width: 360px; box-shadow: 0 8px 32px rgba(0,0,0,0.1); text-align: center; }
+  .logo { font-size: 10px; font-weight: 700; letter-spacing: 0.16em; text-transform: uppercase; color: #C9A84C; margin-bottom: 8px; }
+  h1 { font-size: 22px; font-weight: 700; margin-bottom: 6px; color: #1A1814; }
+  p { font-size: 14px; color: #5A5750; margin-bottom: 24px; }
+  input { width: 100%; padding: 12px 14px; border: 1.5px solid #DDD9D0; border-radius: 10px; font-size: 15px; font-family: Arial, sans-serif; outline: none; margin-bottom: 14px; }
+  input:focus { border-color: #4A7A26; }
+  button { width: 100%; padding: 13px; background: #2D5016; color: #fff; border: none; border-radius: 10px; font-size: 15px; font-weight: 700; cursor: pointer; font-family: Arial, sans-serif; }
+  button:hover { background: #1E3A0F; }
+  .error { background: #FCEAEA; border: 1px solid #E8B4B4; border-radius: 8px; padding: 10px 14px; font-size: 13px; color: #7A1A1A; margin-bottom: 14px; }
+</style>
+</head>
+<body>
+<div class="card">
+  <div class="logo">On Stage America</div>
+  <h1>Admin Dashboard</h1>
+  <p>Enter your password to continue</p>
+  {% if error %}<div class="error">{{ error }}</div>{% endif %}
+  <form method="POST">
+    <input type="password" name="password" placeholder="Password" autofocus required>
+    <button type="submit">Sign In</button>
+  </form>
+</div>
+</body>
+</html>

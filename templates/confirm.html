@@ -1,0 +1,148 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Registration Confirmed — OSA Workshop</title>
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  :root {
+    --forest:#1E3A0F; --green:#2D5016; --green-mid:#4A7A26;
+    --green-light:#EBF3E0; --gold:#C9A84C;
+    --text:#1A1814; --muted:#5A5750; --light:#8A8780;
+    --border:#DDD9D0; --bg:#F2EFE8; --surface:#fff;
+    --success:#1A5A2A; --success-light:#E8F5EC; --success-border:#B8DCC4;
+    --radius:10px; --radius-lg:16px;
+  }
+  body { font-family: Arial, Helvetica, sans-serif; background: var(--bg); color: var(--text); padding: 32px 16px 64px; -webkit-font-smoothing: antialiased; }
+  .wrap { max-width: 600px; margin: 0 auto; }
+  .card-header { background: var(--forest); border-radius: var(--radius-lg) var(--radius-lg) 0 0; padding: 32px 36px 28px; }
+  .eyebrow { font-size: 10px; font-weight: 700; letter-spacing: 0.16em; text-transform: uppercase; color: var(--gold); margin-bottom: 10px; }
+  .header-title { font-family: Georgia, serif; font-size: 36px; color: #fff; line-height: 1.1; margin-bottom: 6px; }
+  .header-sub { font-size: 14px; color: rgba(255,255,255,0.5); }
+  .header-badge { display: inline-flex; align-items: center; gap: 8px; background: rgba(255,255,255,0.1); border: 1px solid rgba(255,255,255,0.15); border-radius: 100px; padding: 6px 14px; margin-top: 16px; font-size: 13px; color: rgba(255,255,255,0.85); }
+  .badge-dot { width: 8px; height: 8px; border-radius: 50%; background: #6FCF3A; flex-shrink: 0; }
+  .stripe { height: 3px; background: linear-gradient(90deg, var(--gold) 0%, var(--green-mid) 50%, var(--gold) 100%); }
+  .card-body { background: var(--surface); border-radius: 0 0 var(--radius-lg) var(--radius-lg); padding: 36px; box-shadow: 0 4px 24px rgba(0,0,0,0.08); }
+  .greeting { font-family: Georgia, serif; font-size: 22px; margin-bottom: 10px; }
+  .intro { font-size: 14px; color: var(--muted); line-height: 1.75; margin-bottom: 28px; }
+
+  /* Details card */
+  .details { border: 1px solid var(--border); border-radius: var(--radius-lg); overflow: hidden; margin-bottom: 24px; }
+  .details-head { background: var(--green-light); border-bottom: 1px solid var(--border); padding: 11px 18px; display: flex; align-items: center; gap: 8px; }
+  .details-dot { width: 7px; height: 7px; border-radius: 50%; background: var(--green); }
+  .details-label { font-size: 11px; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; color: var(--green); }
+  .detail-row { display: flex; padding: 11px 18px; border-bottom: 1px solid #F0EDE6; gap: 14px; }
+  .detail-row:last-child { border-bottom: none; }
+  .detail-key { font-size: 11px; font-weight: 700; color: var(--light); text-transform: uppercase; letter-spacing: 0.04em; min-width: 120px; flex-shrink: 0; padding-top: 2px; }
+  .detail-val { font-size: 14px; font-weight: 500; color: var(--text); }
+  .detail-val.mono { font-family: 'Courier New', monospace; font-size: 13px; background: var(--green-light); color: var(--green); padding: 2px 8px; border-radius: 4px; }
+  .detail-val.free { color: var(--green-mid); font-weight: 700; }
+  .reg-pill { display: inline-block; padding: 3px 10px; border-radius: 100px; font-size: 12px; font-weight: 700; background: var(--green-light); color: var(--green); border: 1px solid #C0D9A0; }
+  .reg-pill.title { background: #FBF5E6; color: #8A6200; border-color: #E8D498; }
+
+  /* QR section */
+  .qr-section { border: 1.5px dashed #C8C4BC; border-radius: var(--radius-lg); padding: 28px 24px; text-align: center; margin-bottom: 24px; background: #FAFAF7; }
+  .qr-eyebrow { font-size: 10px; font-weight: 700; letter-spacing: 0.12em; text-transform: uppercase; color: var(--light); margin-bottom: 4px; }
+  .qr-title { font-family: Georgia, serif; font-size: 20px; margin-bottom: 6px; }
+  .qr-desc { font-size: 13px; color: var(--muted); margin-bottom: 20px; line-height: 1.6; }
+  .qr-frame { display: inline-block; background: #fff; border: 1px solid var(--border); border-radius: var(--radius); padding: 14px; margin-bottom: 12px; box-shadow: 0 2px 12px rgba(0,0,0,0.06); }
+  .qr-frame img { display: block; width: 180px; height: 180px; }
+  .qr-ref { font-family: 'Courier New', monospace; font-size: 11px; color: var(--light); }
+
+  /* Steps */
+  .steps-title { font-size: 11px; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; color: var(--light); margin-bottom: 14px; }
+  .step { display: flex; gap: 14px; margin-bottom: 12px; align-items: flex-start; }
+  .step-num { width: 24px; height: 24px; background: var(--forest); color: #fff; border-radius: 50%; font-size: 11px; font-weight: 700; display: flex; align-items: center; justify-content: center; flex-shrink: 0; margin-top: 1px; }
+  .step-text { font-size: 14px; color: var(--muted); line-height: 1.6; padding-top: 2px; }
+  hr { border: none; border-top: 1px solid var(--border); margin: 24px 0; }
+  .contact { background: var(--green-light); border: 1px solid #C8D9B4; border-radius: var(--radius); padding: 16px 18px; font-size: 13px; color: #3A5A20; line-height: 1.7; }
+  .contact strong { display: block; font-weight: 700; color: var(--green); margin-bottom: 2px; }
+  .contact a { color: var(--green); font-weight: 600; text-decoration: none; }
+  .footer { background: #1A1814; border-radius: 0 0 var(--radius-lg) var(--radius-lg); padding: 24px 36px; text-align: center; margin-top: 0; }
+  .footer-name { font-family: Georgia, serif; font-size: 18px; color: rgba(255,255,255,0.8); margin-bottom: 6px; }
+  .footer-info { font-size: 12px; color: rgba(255,255,255,0.3); line-height: 1.9; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="card-header">
+    <div class="eyebrow">On Stage America</div>
+    <div class="header-title">You're Registered!</div>
+    <div class="header-sub">Workshop Registration Confirmed</div>
+    <div class="header-badge">
+      <div class="badge-dot"></div>
+      {% if reg.is_title %}⭐ Title Registrant — No Charge{% else %}Registration &amp; Payment Confirmed{% endif %}
+    </div>
+  </div>
+  <div class="stripe"></div>
+
+  <div class="card-body">
+    <div class="greeting">Hi {{ reg.first_name }},</div>
+    <div class="intro">
+      {% if reg.is_title %}
+        Your workshop registration has been confirmed as a Title registrant. No payment is required through this form. Please save your QR code below — it's your express check-in pass at the event.
+      {% else %}
+        Your registration and payment have been confirmed. Please save your QR code below — it's your express check-in pass at the event.
+      {% endif %}
+    </div>
+
+    <!-- DETAILS -->
+    <div class="details">
+      <div class="details-head"><div class="details-dot"></div><div class="details-label">Registration Details</div></div>
+      <div class="detail-row"><div class="detail-key">Student</div><div class="detail-val">{{ reg.full_name }}</div></div>
+      <div class="detail-row"><div class="detail-key">Studio</div><div class="detail-val">{{ reg.studio_name }}</div></div>
+      <div class="detail-row">
+        <div class="detail-key">Registration</div>
+        <div class="detail-val">
+          <span class="reg-pill {% if reg.is_title %}title{% endif %}">
+            {% if reg.is_title %}⭐ {% endif %}{{ reg.reg_label }}
+          </span>
+        </div>
+      </div>
+      {% if reg.is_title and reg.routine_name %}
+      <div class="detail-row"><div class="detail-key">Routine</div><div class="detail-val">{{ reg.routine_name }}</div></div>
+      {% endif %}
+      {% if reg.tshirt_size %}
+      <div class="detail-row"><div class="detail-key">T-Shirt Size</div><div class="detail-val">{{ reg.tshirt_size }}</div></div>
+      {% endif %}
+      <div class="detail-row">
+        <div class="detail-key">Amount</div>
+        <div class="detail-val {% if reg.is_title %}free{% endif %}">{{ reg.amount_display }}</div>
+      </div>
+      <div class="detail-row"><div class="detail-key">Confirmation #</div><div class="detail-val mono">{{ reg.id }}</div></div>
+    </div>
+
+    <!-- QR CODE — generated server-side, always works -->
+    <div class="qr-section">
+      <div class="qr-eyebrow">Your Check-In Pass</div>
+      <div class="qr-title">Scan to Check In at the Event</div>
+      <div class="qr-desc">Screenshot or print this page and show this QR code<br>at the check-in desk when you arrive.</div>
+      <div class="qr-frame">
+        <img src="data:image/png;base64,{{ qr_inline }}" alt="Check-in QR Code" width="180" height="180">
+      </div>
+      <div class="qr-ref">Ref # {{ reg.id }}</div>
+    </div>
+
+    <!-- STEPS -->
+    <div class="steps-title">On Event Day</div>
+    <div class="step"><div class="step-num">1</div><div class="step-text">Save or screenshot this page — or print it out.</div></div>
+    <div class="step"><div class="step-num">2</div><div class="step-text">Arrive at the venue and head to the check-in desk.</div></div>
+    <div class="step"><div class="step-num">3</div><div class="step-text">Show your QR code to a staff member. They'll scan it and you're in.</div></div>
+    <div class="step"><div class="step-num">4</div><div class="step-text">Can't find your QR? Staff can also look you up by name.</div></div>
+
+    <hr>
+    <div class="contact">
+      <strong>Questions? We're here.</strong>
+      Email <a href="mailto:osa@onstageamerica.com">osa@onstageamerica.com</a> or call
+      <a href="tel:3016548939">301-654-8939</a> · <a href="https://www.onstageamerica.com">onstageamerica.com</a>
+    </div>
+  </div>
+
+  <div class="footer">
+    <div class="footer-name">On Stage America</div>
+    <div class="footer-info">9603 Meadow Flowers Ct. · Laurel, MD 20723<br>osa@onstageamerica.com · 301-654-8939</div>
+  </div>
+</div>
+</body>
+</html>

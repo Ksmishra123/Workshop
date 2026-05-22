@@ -1,0 +1,7 @@
+flask==3.0.3
+flask-sqlalchemy==3.1.1
+qrcode[pil]==7.4.2
+sendgrid==6.11.0
+square==38.0.0.20240919
+gunicorn==22.0.0
+Pillow==10.4.0
