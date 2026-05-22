@@ -384,12 +384,17 @@
     const wrap = document.getElementById('video-wrap');
     const video = document.getElementById('qr-video');
     try {
-      camStream = await navigator.mediaDevices.getUserMedia({
-        video: { facingMode: 'environment', width: { ideal: 1280 }, height: { ideal: 720 } }
-      });
+      // Try rear camera first, fall back to any camera
+      try {
+        camStream = await navigator.mediaDevices.getUserMedia({
+          video: { facingMode: { exact: 'environment' } }
+        });
+      } catch(e) {
+        camStream = await navigator.mediaDevices.getUserMedia({ video: true });
+      }
       video.srcObject = camStream;
       await video.play();
-      wrap.style.display = '';
+      wrap.style.display = 'block';
       camActive = true;
       btn.textContent = '✕ Stop Camera';
       btn.classList.add('active');
@@ -403,7 +408,7 @@
           canvas.height = video.videoHeight;
           ctx.drawImage(video, 0, 0);
           const img  = ctx.getImageData(0, 0, canvas.width, canvas.height);
-          const code = jsQR(img.data, img.width, img.height, { inversionAttempts: 'dontInvert' });
+          const code = jsQR(img.data, img.width, img.height, { inversionAttempts: 'attemptBoth' });
           if (code && code.data && code.data !== lastCode) {
             lastCode = code.data;
             let sid = code.data.trim();
@@ -417,7 +422,7 @@
       }
       camRaf = requestAnimationFrame(scanFrame);
     } catch(e) {
-      setError('Camera unavailable. Please check browser permissions.');
+      setError('Camera unavailable: ' + (e.message || 'Please check browser permissions.'));
     }
   }
 
@@ -429,6 +434,7 @@
     const wrap = document.getElementById('video-wrap');
     if (btn)  { btn.textContent = '📷 Start Camera'; btn.classList.remove('active'); }
     if (wrap) wrap.style.display = 'none';
+    camStream = null;
   }
 
   // ── UTILS ──
