@@ -197,11 +197,31 @@
       <div class="conditional" id="section-title">
         <div class="info-box">
           <strong>Title Registrant — No Charge</strong>
-          Your fee has been covered through the Title registration system. Please provide your routine name to complete registration.
+          Your fee has been covered through the Title registration system. Please provide your routine name and select which events you are participating in.
         </div>
         <div class="field">
           <label>Name of Routine Entered for Title <span class="req">*</span></label>
           <input type="text" name="routine_name" id="routine_name" placeholder="Routine name">
+        </div>
+        <div class="field" style="margin-top:14px;">
+          <label>Which events are you participating in? <span class="req">*</span></label>
+          <div class="radio-group" style="margin-top:4px;">
+            <label class="radio-option" onclick="selectTitleReg(this,'workshop')">
+              <input type="radio" name="reg_type" value="workshop" class="title-reg-radio">
+              <span class="radio-option-label">Workshop Only</span>
+              <span class="radio-free">No Charge</span>
+            </label>
+            <label class="radio-option" onclick="selectTitleReg(this,'opening')">
+              <input type="radio" name="reg_type" value="opening" class="title-reg-radio">
+              <span class="radio-option-label">Opening Number Only</span>
+              <span class="radio-free">No Charge</span>
+            </label>
+            <label class="radio-option" onclick="selectTitleReg(this,'both')">
+              <input type="radio" name="reg_type" value="both" class="title-reg-radio">
+              <span class="radio-option-label">Both Workshop &amp; Opening Number</span>
+              <span class="radio-free">No Charge</span>
+            </label>
+          </div>
         </div>
       </div>
 
@@ -265,9 +285,10 @@
 
 <script>
   const PRICES = { workshop: 75, opening: 150, both: 225 };
-  let currentTitle = null;
-  let currentReg   = null;
-  let squareCard   = null;
+  let currentTitle    = null;
+  let currentReg      = null;
+  let currentTitleReg = null;
+  let squareCard      = null;
   let squareInitializing = false;
 
   // Attach Square into a visible container — called the first time payment section is shown
@@ -295,18 +316,35 @@
     document.getElementById('section-title').classList.toggle('show', val === 'yes');
     document.getElementById('section-nontitle').classList.toggle('show', val === 'no');
     if (val === 'yes') {
-      document.getElementById('section-tshirt').classList.add('show');
       document.getElementById('section-payment').classList.remove('show');
-      document.getElementById('tshirt_size').required = true;
       document.getElementById('routine_name').required = true;
+      // Reset title reg selection when switching back to yes
+      currentTitleReg = null;
       currentReg = null;
+      document.querySelectorAll('.title-reg-radio').forEach(r => r.checked = false);
+      document.querySelectorAll('#section-title .radio-option').forEach(o => o.classList.remove('selected'));
+      // T-shirt visibility depends on title reg type — hide until selected
+      document.getElementById('section-tshirt').classList.remove('show');
+      document.getElementById('tshirt_size').required = false;
     } else {
       document.getElementById('section-tshirt').classList.remove('show');
       document.getElementById('section-payment').classList.remove('show');
       document.getElementById('tshirt_size').required = false;
       document.getElementById('routine_name').required = false;
+      currentTitleReg = null;
     }
     updateTotal();
+    checkReady();
+  }
+
+  function selectTitleReg(el, type) {
+    currentTitleReg = type;
+    document.querySelectorAll('#section-title .radio-option').forEach(o => o.classList.remove('selected'));
+    el.classList.add('selected');
+    // Show t-shirt for opening or both
+    const needsShirt = type === 'opening' || type === 'both';
+    document.getElementById('section-tshirt').classList.toggle('show', needsShirt);
+    document.getElementById('tshirt_size').required = needsShirt;
     checkReady();
   }
 
@@ -335,7 +373,8 @@
 
   function checkReady() {
     const ready = currentTitle !== null && (
-      currentTitle === 'yes' || currentReg !== null
+      (currentTitle === 'yes' && currentTitleReg !== null) ||
+      (currentTitle === 'no'  && currentReg !== null)
     );
     document.getElementById('submit-btn').disabled = !ready;
   }
@@ -361,7 +400,7 @@
     }
     if (!data.is_title) { showError('Please select Yes or No for Title registration.'); resetBtn(); return; }
     if (data.is_title === 'yes' && !data.routine_name) { showError('Please enter your routine name.'); resetBtn(); return; }
-    if (data.is_title === 'no' && !data.reg_type) { showError('Please select a registration type.'); resetBtn(); return; }
+    if (!data.reg_type) { showError('Please select which events you are participating in.'); resetBtn(); return; }
 
     // Tokenize payment if needed
     if (data.is_title === 'no') {
