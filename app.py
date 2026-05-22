@@ -269,12 +269,31 @@ def qr_image(reg_id):
     return Response(qr_bytes, mimetype='image/png')
 
 # ── CHECK-IN KIOSK ──
+@app.route('/checkin/login', methods=['GET', 'POST'])
+def checkin_login():
+    error = None
+    if request.method == 'POST':
+        if request.form.get('password') == ADMIN_PASSWORD:
+            session['checkin'] = True
+            return redirect(url_for('checkin'))
+        error = 'Incorrect password'
+    return render_template('checkin_login.html', error=error)
+
+@app.route('/checkin/logout')
+def checkin_logout():
+    session.pop('checkin', None)
+    return redirect(url_for('checkin_login'))
+
 @app.route('/checkin')
 def checkin():
+    if not session.get('checkin'):
+        return redirect(url_for('checkin_login'))
     return render_template('checkin.html')
 
 @app.route('/checkin/lookup', methods=['POST'])
 def checkin_lookup():
+    if not session.get('checkin'):
+        return jsonify({'error': 'Unauthorized'}), 401
     data  = request.get_json()
     raw   = (data.get('id') or '').strip()
     # Handle CHECKIN:uuid format from QR
@@ -287,6 +306,8 @@ def checkin_lookup():
 
 @app.route('/checkin/confirm', methods=['POST'])
 def checkin_confirm():
+    if not session.get('checkin'):
+        return jsonify({'error': 'Unauthorized'}), 401
     data   = request.get_json()
     reg_id = data.get('id')
     reg    = db.session.get(Registration, reg_id)
@@ -306,6 +327,8 @@ def checkin_confirm():
 
 @app.route('/checkin/undo', methods=['POST'])
 def checkin_undo():
+    if not session.get('checkin'):
+        return jsonify({'error': 'Unauthorized'}), 401
     data   = request.get_json()
     reg_id = data.get('id')
     reg    = db.session.get(Registration, reg_id)
@@ -318,6 +341,8 @@ def checkin_undo():
 
 @app.route('/checkin/stats')
 def checkin_stats():
+    if not session.get('checkin'):
+        return jsonify({'error': 'Unauthorized'}), 401
     total    = Registration.query.count()
     checked  = Registration.query.filter_by(checked_in=True).count()
     return jsonify({'total': total, 'checked_in': checked, 'pending': total - checked})
