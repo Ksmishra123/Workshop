@@ -268,17 +268,23 @@
   let currentTitle = null;
   let currentReg   = null;
   let squareCard   = null;
-  let squarePayments = null;
+  let squareInitializing = false;
 
-  // Square init
+  // Attach Square into a visible container — called the first time payment section is shown
   async function initSquare() {
-    if (!window.Square) return;
-    const appId     = '{{ sq_app_id }}';
-    const locationId= '{{ sq_location }}';
-    if (!appId || appId === '') return;
-    squarePayments = window.Square.payments(appId, locationId);
-    squareCard     = await squarePayments.card();
-    await squareCard.attach('#square-card-container');
+    if (squareCard || squareInitializing || !window.Square) return;
+    const appId      = '{{ sq_app_id }}';
+    const locationId = '{{ sq_location }}';
+    if (!appId) return;
+    squareInitializing = true;
+    try {
+      const payments = window.Square.payments(appId, locationId);
+      squareCard = await payments.card();
+      await squareCard.attach('#square-card-container');
+    } catch(e) {
+      console.error('Square init error:', e);
+    }
+    squareInitializing = false;
   }
 
   function setTitle(val, el) {
@@ -313,9 +319,11 @@
     document.getElementById('tshirt_size').required = needsShirt;
     document.getElementById('section-payment').classList.add('show');
     updateTotal();
-    if (!squareCard) initSquare();
+    // Attach Square now that the container is visible (no-op after first call)
+    initSquare();
     checkReady();
   }
+
 
   function updateTotal() {
     let amt = 0;
@@ -394,13 +402,6 @@
     btn.innerHTML = 'Complete Registration';
   }
 
-  // Style radio options
-  document.querySelectorAll('.radio-option input').forEach(r => {
-    r.addEventListener('change', () => {
-      document.querySelectorAll('.radio-option').forEach(o => o.classList.remove('selected'));
-      r.closest('.radio-option').classList.add('selected');
-    });
-  });
 </script>
 </body>
 </html>
