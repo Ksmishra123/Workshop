@@ -267,7 +267,10 @@
   async function lookup() {
     let raw = document.getElementById('id-input').value.trim();
     if (!raw) return;
-    if (raw.toUpperCase().startsWith('CHECKIN:')) raw = raw.split(':')[1];
+    // Extract UUID from full confirmation URL
+    if (raw.includes('/confirm/')) raw = raw.split('/confirm/').pop().split('/')[0];
+    // Legacy CHECKIN:uuid format
+    else if (raw.toUpperCase().startsWith('CHECKIN:')) raw = raw.split(':')[1];
     raw = raw.replace(/[^a-zA-Z0-9-]/g, '');
     if (!raw) return;
 
@@ -412,7 +415,8 @@
           if (code && code.data && code.data !== lastCode) {
             lastCode = code.data;
             let sid = code.data.trim();
-            if (sid.toUpperCase().startsWith('CHECKIN:')) sid = sid.split(':')[1];
+            if (sid.includes('/confirm/')) sid = sid.split('/confirm/').pop().split('/')[0];
+            else if (sid.toUpperCase().startsWith('CHECKIN:')) sid = sid.split(':')[1];
             document.getElementById('id-input').value = sid;
             lookup();
             setTimeout(() => { lastCode = ''; }, 4000);

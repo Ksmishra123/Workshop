@@ -130,7 +130,8 @@ def send_confirmation_email(reg: Registration):
         print('No SendGrid key — skipping email')
         return
 
-    qr_data   = f'CHECKIN:{reg.id}'
+    base_url  = os.environ.get('BASE_URL', 'http://localhost:5000')
+    qr_data   = f'{base_url}/confirm/{reg.id}'
     qr_bytes  = generate_qr_bytes(qr_data)
     qr_b64    = base64.b64encode(qr_bytes).decode()
     qr_inline = generate_qr_base64(qr_data)
@@ -256,7 +257,8 @@ def submit_registration():
 @app.route('/confirm/<reg_id>')
 def confirm(reg_id):
     reg = db.get_or_404(Registration, reg_id)
-    qr_data   = f'CHECKIN:{reg.id}'
+    base_url  = os.environ.get('BASE_URL', 'http://localhost:5000')
+    qr_data   = f'{base_url}/confirm/{reg.id}'
     qr_inline = generate_qr_base64(qr_data)
     return render_template('confirm.html', reg=reg, qr_inline=qr_inline)
 
@@ -265,7 +267,8 @@ def confirm(reg_id):
 def qr_image(reg_id):
     from flask import Response
     reg = db.get_or_404(Registration, reg_id)
-    qr_bytes = generate_qr_bytes(f'CHECKIN:{reg.id}')
+    base_url = os.environ.get('BASE_URL', 'http://localhost:5000')
+    qr_bytes = generate_qr_bytes(f'{base_url}/confirm/{reg.id}')
     return Response(qr_bytes, mimetype='image/png')
 
 # ── CHECK-IN KIOSK ──
@@ -296,8 +299,11 @@ def checkin_lookup():
         return jsonify({'error': 'Unauthorized'}), 401
     data  = request.get_json()
     raw   = (data.get('id') or '').strip()
-    # Handle CHECKIN:uuid format from QR
-    if raw.upper().startswith('CHECKIN:'):
+    # Handle full confirmation URL from QR (e.g. https://app.com/confirm/<uuid>)
+    if '/confirm/' in raw:
+        raw = raw.split('/confirm/')[-1].strip('/')
+    # Legacy CHECKIN:uuid format
+    elif raw.upper().startswith('CHECKIN:'):
         raw = raw.split(':', 1)[1]
     reg = db.session.get(Registration, raw)
     if not reg:
