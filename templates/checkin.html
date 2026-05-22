@@ -390,7 +390,7 @@
     const video = document.getElementById('qr-video');
     try {
       zxingReader = new ZXing.BrowserMultiFormatReader();
-      const devices = await ZXing.BrowserMultiFormatReader.listVideoInputDevices();
+      const devices = await zxingReader.listVideoInputDevices();
       // Prefer rear/environment camera on mobile
       const device = devices.find(d => /back|rear|environment/i.test(d.label)) || devices[devices.length - 1];
       const deviceId = device ? device.deviceId : undefined;
