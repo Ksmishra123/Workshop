@@ -440,6 +440,102 @@ def admin_export():
     return Response(generate(), mimetype='text/csv',
                     headers={'Content-Disposition': 'attachment; filename=osa_registrations.csv'})
 
+# ── CSV TEMPLATE DOWNLOAD ──
+@app.route('/registration-template.csv')
+def registration_template():
+    from flask import Response
+    headers = [
+        'studio_name', 'first_name', 'last_name', 'gender', 'birth_date',
+        'email', 'phone', 'mobile', 'is_title', 'routine_name',
+        'reg_type', 'tshirt_size',
+    ]
+    notes = [
+        'Your Studio Name', 'First', 'Last', 'Female / Male / Non-binary',
+        'MM/DD/YYYY', 'email@example.com', '555-000-0000', '555-000-0000',
+        'yes / no', 'Routine name if title registrant (else leave blank)',
+        'workshop / opening / both', 'YS / YM / YL / AS / AM / AL / AXL / AXXL',
+    ]
+    def generate():
+        yield ','.join(headers) + '\n'
+        yield ','.join(f'"{n}"' for n in notes) + '\n'
+    return Response(generate(), mimetype='text/csv',
+                    headers={'Content-Disposition': 'attachment; filename=osa_registration_template.csv'})
+
+# ── ADMIN CSV UPLOAD ──
+@app.route('/admin/upload', methods=['GET'])
+def admin_upload():
+    if not session.get('admin'):
+        return redirect(url_for('admin_login'))
+    return render_template('admin_upload.html')
+
+@app.route('/admin/upload/process', methods=['POST'])
+def admin_upload_process():
+    if not session.get('admin'):
+        abort(403)
+    import csv, io as _io
+    file = request.files.get('csv_file')
+    if not file or not file.filename.endswith('.csv'):
+        return jsonify({'error': 'Please upload a .csv file'}), 400
+
+    content = file.read().decode('utf-8-sig')  # strip BOM if Excel-generated
+    reader  = csv.DictReader(_io.StringIO(content))
+
+    # Normalise header names (strip spaces, lowercase)
+    def norm(k):
+        return k.strip().lower().replace(' ', '_')
+
+    results = []
+    errors  = []
+    row_num = 1
+
+    for raw_row in reader:
+        row_num += 1
+        row = {norm(k): (v or '').strip() for k, v in raw_row.items()}
+
+        # Skip the sample/notes row if it looks like instructions
+        if row.get('studio_name', '').lower() in ('your studio name', 'studio name'):
+            continue
+
+        first = row.get('first_name', '')
+        last  = row.get('last_name', '')
+        if not first or not last:
+            errors.append(f'Row {row_num}: missing first or last name — skipped')
+            continue
+
+        is_title  = row.get('is_title', 'no').lower() in ('yes', 'y', '1', 'true')
+        reg_type  = row.get('reg_type', 'workshop').lower().strip()
+        if reg_type not in ('workshop', 'opening', 'both'):
+            reg_type = 'workshop'
+
+        amount = 0 if is_title else PRICES.get(reg_type, 0)
+
+        reg = Registration(
+            studio_name   = row.get('studio_name', ''),
+            first_name    = first,
+            last_name     = last,
+            gender        = row.get('gender', ''),
+            birth_date    = row.get('birth_date', ''),
+            email         = row.get('email', '').lower(),
+            phone         = row.get('phone', ''),
+            mobile        = row.get('mobile', ''),
+            is_title      = is_title,
+            routine_name  = row.get('routine_name', ''),
+            reg_type      = reg_type,
+            tshirt_size   = row.get('tshirt_size', ''),
+            amount        = amount,
+            payment_status = 'free' if is_title else 'invoiced',
+        )
+        db.session.add(reg)
+        results.append({'name': f'{first} {last}', 'reg_type': reg_type, 'is_title': is_title})
+
+    try:
+        db.session.commit()
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'error': f'Database error: {e}'}), 500
+
+    return jsonify({'imported': len(results), 'errors': errors, 'rows': results})
+
 # ── INIT DB ──
 with app.app_context():
     db.create_all()

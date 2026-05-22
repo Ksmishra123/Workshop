@@ -1,0 +1,255 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Bulk Upload — OSA Admin</title>
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  :root {
+    --forest:#1E3A0F;--green:#2D5016;--green-mid:#4A7A26;
+    --green-light:#EBF3E0;--gold:#C9A84C;
+    --text:#1A1814;--muted:#5A5750;--light:#8A8780;
+    --border:#DDD9D0;--bg:#F2EFE8;--surface:#fff;--surface2:#F4F1EB;
+    --success:#1A5A2A;--success-light:#E8F5EC;--success-border:#B8DCC4;
+    --warn:#7A4A00;--warn-light:#FFF3DC;
+    --radius:10px;--radius-lg:16px;
+    --shadow:0 1px 4px rgba(0,0,0,0.07);
+  }
+  body { font-family: Arial, Helvetica, sans-serif; background: var(--bg); color: var(--text); min-height: 100vh; }
+  .topbar { background: var(--forest); padding: 0 24px; height: 52px; display: flex; align-items: center; gap: 14px; position: sticky; top: 0; z-index: 50; }
+  .topbar-logo { font-size: 10px; font-weight: 700; letter-spacing: 0.14em; text-transform: uppercase; color: var(--gold); }
+  .topbar-title { font-size: 14px; color: rgba(255,255,255,0.6); }
+  .topbar-right { margin-left: auto; display: flex; gap: 10px; }
+  .topbar-btn { background: rgba(255,255,255,0.1); border: 1px solid rgba(255,255,255,0.15); color: rgba(255,255,255,0.8); padding: 6px 14px; border-radius: 6px; font-size: 13px; cursor: pointer; text-decoration: none; }
+  .topbar-btn:hover { background: rgba(255,255,255,0.2); }
+  .stripe { height: 3px; background: linear-gradient(90deg,var(--gold) 0%,var(--green-mid) 50%,var(--gold) 100%); }
+  .main { padding: 32px; max-width: 780px; margin: 0 auto; }
+  h1 { font-size: 22px; font-weight: 700; margin-bottom: 6px; }
+  .sub { font-size: 14px; color: var(--muted); margin-bottom: 28px; }
+
+  .card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-lg); padding: 28px; box-shadow: var(--shadow); margin-bottom: 24px; }
+  .card h2 { font-size: 15px; font-weight: 700; margin-bottom: 14px; }
+
+  .steps { display: flex; flex-direction: column; gap: 10px; margin-bottom: 0; }
+  .step { display: flex; gap: 14px; align-items: flex-start; }
+  .step-num { width: 26px; height: 26px; border-radius: 50%; background: var(--forest); color: #fff; font-size: 12px; font-weight: 700; display: flex; align-items: center; justify-content: center; flex-shrink: 0; margin-top: 1px; }
+  .step-body { font-size: 14px; line-height: 1.5; }
+  .step-body a { color: var(--green-mid); font-weight: 700; }
+
+  .upload-zone { border: 2px dashed var(--border); border-radius: var(--radius); padding: 40px 24px; text-align: center; cursor: pointer; transition: border-color 0.2s, background 0.2s; position: relative; }
+  .upload-zone.drag { border-color: var(--green-mid); background: var(--green-light); }
+  .upload-zone input[type=file] { position: absolute; inset: 0; opacity: 0; cursor: pointer; width: 100%; height: 100%; }
+  .upload-icon { font-size: 32px; margin-bottom: 10px; }
+  .upload-label { font-size: 15px; font-weight: 600; color: var(--text); }
+  .upload-hint { font-size: 13px; color: var(--light); margin-top: 4px; }
+  .file-chosen { font-size: 13px; color: var(--green-mid); font-weight: 600; margin-top: 8px; }
+
+  .btn { display: inline-block; padding: 11px 24px; border-radius: var(--radius); font-size: 14px; font-weight: 700; cursor: pointer; border: none; font-family: Arial, sans-serif; }
+  .btn-primary { background: var(--green-mid); color: #fff; }
+  .btn-primary:hover { background: var(--green); }
+  .btn-primary:disabled { background: var(--light); cursor: not-allowed; }
+  .btn-gold { background: var(--gold); color: #1A1814; }
+  .btn-gold:hover { opacity: 0.9; }
+
+  .result-box { display: none; }
+  .result-box.show { display: block; }
+  .result-success { background: var(--success-light); border: 1px solid var(--success-border); border-radius: var(--radius); padding: 18px 20px; margin-bottom: 16px; }
+  .result-success strong { color: var(--success); }
+  .result-errors { background: var(--warn-light); border: 1px solid #EDD8A0; border-radius: var(--radius); padding: 14px 18px; margin-bottom: 16px; font-size: 13px; color: var(--warn); }
+  .result-errors ul { margin-top: 8px; margin-left: 18px; }
+
+  .preview-table-wrap { overflow-x: auto; border: 1px solid var(--border); border-radius: var(--radius); }
+  table { width: 100%; border-collapse: collapse; font-size: 13px; }
+  thead th { background: var(--forest); color: rgba(255,255,255,0.8); padding: 10px 12px; text-align: left; font-size: 11px; text-transform: uppercase; letter-spacing: 0.07em; white-space: nowrap; }
+  tbody td { padding: 10px 12px; border-bottom: 1px solid var(--border); }
+  tbody tr:last-child td { border-bottom: none; }
+  tbody tr:hover { background: var(--surface2); }
+  .badge { display: inline-block; padding: 2px 7px; border-radius: 100px; font-size: 11px; font-weight: 700; }
+  .badge.title { background: #FBF5E6; color: #8A6200; border: 1px solid #E8D498; }
+  .badge.workshop { background: var(--green-light); color: var(--green); border: 1px solid #C0D9A0; }
+  .badge.opening { background: #EEF0F8; color: #4A5080; border: 1px solid #C8CCDC; }
+  .badge.both { background: #F0E8F8; color: #6A3080; border: 1px solid #D0B0E8; }
+
+  .loading { display: none; align-items: center; gap: 10px; font-size: 14px; color: var(--muted); }
+  .loading.show { display: flex; }
+  .spinner { width: 18px; height: 18px; border: 2px solid var(--border); border-top-color: var(--green-mid); border-radius: 50%; animation: spin 0.7s linear infinite; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  .col-schema { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+  .col-item { background: var(--surface2); border-radius: 6px; padding: 8px 12px; font-size: 12px; }
+  .col-name { font-family: 'Courier New', monospace; font-weight: 700; color: var(--forest); }
+  .col-desc { color: var(--muted); margin-top: 2px; }
+  @media (max-width: 600px) { .col-schema { grid-template-columns: 1fr; } .main { padding: 16px; } }
+</style>
+</head>
+<body>
+
+<div class="topbar">
+  <div class="topbar-logo">On Stage America</div>
+  <span style="color:rgba(255,255,255,0.2);">/</span>
+  <div class="topbar-title">Bulk Studio Upload</div>
+  <div class="topbar-right">
+    <a href="/admin" class="topbar-btn">← Dashboard</a>
+  </div>
+</div>
+<div class="stripe"></div>
+
+<div class="main">
+  <h1>Studio Bulk Registration</h1>
+  <p class="sub">Upload a CSV file prepared by a studio to register multiple students at once. No payment is charged — registrations are marked <strong>Invoiced</strong> and you bill the studio separately.</p>
+
+  <!-- INSTRUCTIONS -->
+  <div class="card">
+    <h2>How It Works</h2>
+    <div class="steps">
+      <div class="step">
+        <div class="step-num">1</div>
+        <div class="step-body">Share the <a href="/registration-template.csv" download>CSV template</a> with the studio (or send them the download link from the registration page).</div>
+      </div>
+      <div class="step">
+        <div class="step-num">2</div>
+        <div class="step-body">The studio fills in one row per student and emails the completed file back to you.</div>
+      </div>
+      <div class="step">
+        <div class="step-num">3</div>
+        <div class="step-body">Upload the file here. Students are imported instantly and appear in the dashboard.</div>
+      </div>
+      <div class="step">
+        <div class="step-num">4</div>
+        <div class="step-body">Invoice the studio separately for the total amount owed.</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- COLUMN REFERENCE -->
+  <div class="card">
+    <h2>CSV Columns</h2>
+    <div class="col-schema">
+      <div class="col-item"><div class="col-name">studio_name</div><div class="col-desc">Studio's full name</div></div>
+      <div class="col-item"><div class="col-name">first_name</div><div class="col-desc">Student first name (required)</div></div>
+      <div class="col-item"><div class="col-name">last_name</div><div class="col-desc">Student last name (required)</div></div>
+      <div class="col-item"><div class="col-name">gender</div><div class="col-desc">Female / Male / Non-binary</div></div>
+      <div class="col-item"><div class="col-name">birth_date</div><div class="col-desc">MM/DD/YYYY</div></div>
+      <div class="col-item"><div class="col-name">email</div><div class="col-desc">Contact email</div></div>
+      <div class="col-item"><div class="col-name">phone</div><div class="col-desc">Phone number</div></div>
+      <div class="col-item"><div class="col-name">mobile</div><div class="col-desc">Mobile number (optional)</div></div>
+      <div class="col-item"><div class="col-name">is_title</div><div class="col-desc">yes / no — title registrant?</div></div>
+      <div class="col-item"><div class="col-name">routine_name</div><div class="col-desc">Routine name (title only)</div></div>
+      <div class="col-item"><div class="col-name">reg_type</div><div class="col-desc">workshop / opening / both</div></div>
+      <div class="col-item"><div class="col-name">tshirt_size</div><div class="col-desc">YS YM YL AS AM AL AXL AXXL</div></div>
+    </div>
+  </div>
+
+  <!-- UPLOAD FORM -->
+  <div class="card">
+    <h2>Upload CSV</h2>
+    <div class="upload-zone" id="drop-zone">
+      <input type="file" id="csv-file" accept=".csv" onchange="onFileChosen(this)">
+      <div class="upload-icon">📄</div>
+      <div class="upload-label">Click to choose a CSV file</div>
+      <div class="upload-hint">or drag and drop here</div>
+      <div class="file-chosen" id="file-name"></div>
+    </div>
+
+    <div style="margin-top:18px;display:flex;gap:12px;align-items:center;flex-wrap:wrap;">
+      <button class="btn btn-primary" id="upload-btn" onclick="uploadFile()" disabled>Import Students</button>
+      <a href="/registration-template.csv" download class="btn btn-gold">⬇ Download Template</a>
+      <div class="loading" id="loading"><div class="spinner"></div> Importing…</div>
+    </div>
+  </div>
+
+  <!-- RESULTS -->
+  <div class="result-box" id="result-box">
+    <div class="result-success" id="result-success"></div>
+    <div class="result-errors" id="result-errors" style="display:none;"></div>
+    <div class="card" id="result-table-card" style="display:none;">
+      <h2>Imported Students</h2>
+      <div class="preview-table-wrap">
+        <table>
+          <thead><tr><th>#</th><th>Name</th><th>Registration Type</th></tr></thead>
+          <tbody id="result-tbody"></tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<script>
+  const dropZone = document.getElementById('drop-zone');
+  dropZone.addEventListener('dragover', e => { e.preventDefault(); dropZone.classList.add('drag'); });
+  dropZone.addEventListener('dragleave', () => dropZone.classList.remove('drag'));
+  dropZone.addEventListener('drop', e => {
+    e.preventDefault();
+    dropZone.classList.remove('drag');
+    const f = e.dataTransfer.files[0];
+    if (f) { document.getElementById('csv-file').files = e.dataTransfer.files; onFileChosen({ files: [f] }); }
+  });
+
+  function onFileChosen(input) {
+    const f = input.files[0];
+    document.getElementById('file-name').textContent = f ? f.name : '';
+    document.getElementById('upload-btn').disabled = !f;
+  }
+
+  async function uploadFile() {
+    const fileInput = document.getElementById('csv-file');
+    if (!fileInput.files[0]) return;
+
+    document.getElementById('upload-btn').disabled = true;
+    document.getElementById('loading').classList.add('show');
+    document.getElementById('result-box').classList.remove('show');
+
+    const form = new FormData();
+    form.append('csv_file', fileInput.files[0]);
+
+    try {
+      const res  = await fetch('/admin/upload/process', { method: 'POST', body: form });
+      const data = await res.json();
+
+      document.getElementById('loading').classList.remove('show');
+      document.getElementById('result-box').classList.add('show');
+
+      if (data.error) {
+        document.getElementById('result-success').innerHTML =
+          `<strong>Error:</strong> ${data.error}`;
+        document.getElementById('result-success').style.background = '#FFF3DC';
+        document.getElementById('result-success').style.borderColor = '#EDD8A0';
+        return;
+      }
+
+      document.getElementById('result-success').innerHTML =
+        `<strong>✓ ${data.imported} student${data.imported !== 1 ? 's' : ''} imported successfully.</strong>
+         Payment status set to <strong>Invoiced</strong> — bill the studio separately.`;
+
+      const errBox = document.getElementById('result-errors');
+      if (data.errors && data.errors.length) {
+        errBox.style.display = '';
+        errBox.innerHTML = `<strong>${data.errors.length} row(s) skipped:</strong><ul>` +
+          data.errors.map(e => `<li>${e}</li>`).join('') + '</ul>';
+      } else {
+        errBox.style.display = 'none';
+      }
+
+      const tbody = document.getElementById('result-tbody');
+      tbody.innerHTML = '';
+      if (data.rows && data.rows.length) {
+        data.rows.forEach((r, i) => {
+          const typeClass = r.is_title ? 'title' : r.reg_type;
+          const typeLabel = r.is_title ? '⭐ Title' : { workshop: 'Workshop Only', opening: 'Opening Only', both: 'Workshop & Opening' }[r.reg_type] || r.reg_type;
+          tbody.innerHTML += `<tr><td>${i+1}</td><td>${r.name}</td><td><span class="badge ${typeClass}">${typeLabel}</span></td></tr>`;
+        });
+        document.getElementById('result-table-card').style.display = '';
+      }
+
+      document.getElementById('upload-btn').disabled = false;
+    } catch(e) {
+      document.getElementById('loading').classList.remove('show');
+      alert('Upload failed: ' + e.message);
+      document.getElementById('upload-btn').disabled = false;
+    }
+  }
+</script>
+</body>
+</html>
