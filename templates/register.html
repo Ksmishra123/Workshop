@@ -109,6 +109,11 @@
   /* Error / spinner */
   .form-error { background: var(--danger-light); border: 1px solid #E8B4B4; border-radius: var(--radius); padding: 12px 16px; font-size: 14px; color: var(--danger); margin-top: 14px; display: none; }
   .form-error.show { display: block; }
+  .field-error input, .field-error select, .field-error textarea { border-color: var(--danger) !important; background: var(--danger-light) !important; }
+  .field-error-msg { font-size: 11px; color: var(--danger); font-weight: 700; margin-top: 3px; display: none; }
+  .field-error .field-error-msg { display: block; }
+  .yesno-error .yesno-btn { border-color: var(--danger); }
+  .radio-group-error .radio-option { border-color: var(--danger); }
   .spinner { display: inline-block; width: 20px; height: 20px; border: 2px solid rgba(255,255,255,0.3); border-top-color: #fff; border-radius: 50%; animation: spin 0.7s linear infinite; }
   @keyframes spin { to { transform: rotate(360deg); } }
 
@@ -139,43 +144,50 @@
       <!-- DANCER INFO -->
       <div class="section-heading">Dancer Information</div>
       <div class="grid-2">
-        <div class="field">
+        <div class="field" id="field-studio_name">
           <label>Studio Name <span class="req">*</span></label>
           <input type="text" name="studio_name" required placeholder="Studio name">
+          <span class="field-error-msg">Studio name is required</span>
         </div>
-        <div class="field">
+        <div class="field" id="field-gender">
           <label>Gender <span class="req">*</span></label>
           <select name="gender" required>
             <option value="">Select…</option>
             <option>Female</option><option>Male</option>
             <option>Non-binary</option><option>Prefer not to say</option>
           </select>
+          <span class="field-error-msg">Please select a gender</span>
         </div>
       </div>
       <div class="grid-2">
-        <div class="field">
+        <div class="field" id="field-first_name">
           <label>First Name <span class="req">*</span></label>
           <input type="text" name="first_name" required placeholder="First name">
+          <span class="field-error-msg">First name is required</span>
         </div>
-        <div class="field">
+        <div class="field" id="field-last_name">
           <label>Last Name <span class="req">*</span></label>
           <input type="text" name="last_name" required placeholder="Last name">
+          <span class="field-error-msg">Last name is required</span>
         </div>
       </div>
       <div class="grid-2">
-        <div class="field">
+        <div class="field" id="field-birth_date">
           <label>Birth Date <span class="req">*</span></label>
           <input type="date" name="birth_date" required>
+          <span class="field-error-msg">Birth date is required</span>
         </div>
-        <div class="field">
+        <div class="field" id="field-email">
           <label>Email <span class="req">*</span></label>
           <input type="email" name="email" required placeholder="email@example.com">
+          <span class="field-error-msg">A valid email is required</span>
         </div>
       </div>
       <div class="grid-3">
-        <div class="field">
+        <div class="field" id="field-phone">
           <label>Phone <span class="req">*</span></label>
           <input type="tel" name="phone" required placeholder="Phone">
+          <span class="field-error-msg">Phone number is required</span>
         </div>
         <div class="field">
           <label>Mobile</label>
@@ -189,12 +201,13 @@
 
       <!-- REGISTRATION TYPE -->
       <div class="section-heading">Registration Type</div>
-      <div class="field">
+      <div class="field" id="field-is_title">
         <label>Are you registered for Title at this Nationals? <span class="req">*</span></label>
-        <div class="yesno-group" style="margin-top:4px;">
+        <div class="yesno-group" id="yesno-is_title" style="margin-top:4px;">
           <div class="yesno-btn" onclick="setTitle('yes', this)">Yes</div>
           <div class="yesno-btn" onclick="setTitle('no', this)">No</div>
         </div>
+        <span class="field-error-msg">Please select Yes or No</span>
         <input type="hidden" name="is_title" id="is_title_val" required>
       </div>
 
@@ -204,13 +217,14 @@
           <strong>Title Registrant — No Charge</strong>
           Your fee has been covered through the Title registration system. Please provide your routine name and select which events you are participating in.
         </div>
-        <div class="field">
+        <div class="field" id="field-routine_name">
           <label>Name of Routine Entered for Title <span class="req">*</span></label>
           <input type="text" name="routine_name" id="routine_name" placeholder="Routine name">
+          <span class="field-error-msg">Routine name is required</span>
         </div>
-        <div class="field" style="margin-top:14px;">
+        <div class="field" style="margin-top:14px;" id="field-reg_type_title">
           <label>Which events are you participating in? <span class="req">*</span></label>
-          <div class="radio-group" style="margin-top:4px;">
+          <div class="radio-group" id="radio-group-title" style="margin-top:4px;">
             <label class="radio-option" onclick="selectTitleReg(this,'workshop')">
               <input type="radio" name="reg_type" value="workshop" class="title-reg-radio">
               <span class="radio-option-label">Workshop Only</span>
@@ -227,14 +241,15 @@
               <span class="radio-free">No Charge</span>
             </label>
           </div>
+          <span class="field-error-msg">Please select which events you are participating in</span>
         </div>
       </div>
 
       <!-- TITLE = NO -->
       <div class="conditional" id="section-nontitle">
-        <div class="field">
+        <div class="field" id="field-reg_type_nontitle">
           <label>Please select your registration <span class="req">*</span></label>
-          <div class="radio-group" style="margin-top:4px;">
+          <div class="radio-group" id="radio-group-nontitle" style="margin-top:4px;">
             <label class="radio-option" onclick="selectReg(this,'workshop')">
               <input type="radio" name="reg_type" value="workshop">
               <span class="radio-option-label">Workshop Only</span>
@@ -251,6 +266,7 @@
               <span class="radio-option-price">$225.00</span>
             </label>
           </div>
+          <span class="field-error-msg">Please select a registration type</span>
         </div>
       </div>
 
@@ -313,6 +329,7 @@
   }
 
   function setTitle(val, el) {
+    document.getElementById('field-is_title')?.classList.remove('field-error');
     currentTitle = val;
     document.getElementById('is_title_val').value = val;
     document.querySelectorAll('.yesno-btn').forEach(b => b.classList.remove('selected'));
@@ -342,6 +359,7 @@
   }
 
   function selectTitleReg(el, type) {
+    document.getElementById('field-reg_type_title')?.classList.remove('field-error');
     currentTitleReg = type;
     document.querySelectorAll('#section-title .radio-option').forEach(o => o.classList.remove('selected'));
     el.classList.add('selected');
@@ -353,6 +371,7 @@
   }
 
   function selectReg(el, type) {
+    document.getElementById('field-reg_type_nontitle')?.classList.remove('field-error');
     currentReg = type;
     document.querySelectorAll('.radio-option').forEach(o => o.classList.remove('selected'));
     el.classList.add('selected');
@@ -383,6 +402,49 @@
     document.getElementById('submit-btn').disabled = !ready;
   }
 
+  function clearFieldErrors() {
+    document.querySelectorAll('.field-error').forEach(el => el.classList.remove('field-error'));
+    document.querySelectorAll('.yesno-error').forEach(el => el.classList.remove('yesno-error'));
+    document.querySelectorAll('.radio-group-error').forEach(el => el.classList.remove('radio-group-error'));
+  }
+
+  function markFieldError(fieldId) {
+    const el = document.getElementById(fieldId);
+    if (el) el.classList.add('field-error');
+    return el;
+  }
+
+  function validateForm(data) {
+    clearFieldErrors();
+    const issues = [];
+
+    const textFields = [
+      { key: 'studio_name', id: 'field-studio_name' },
+      { key: 'first_name',  id: 'field-first_name' },
+      { key: 'last_name',   id: 'field-last_name' },
+      { key: 'gender',      id: 'field-gender' },
+      { key: 'birth_date',  id: 'field-birth_date' },
+      { key: 'email',       id: 'field-email' },
+      { key: 'phone',       id: 'field-phone' },
+    ];
+    for (const { key, id } of textFields) {
+      if (!data[key]) issues.push(markFieldError(id));
+    }
+
+    if (!data.is_title) {
+      issues.push(markFieldError('field-is_title'));
+    } else if (data.is_title === 'yes' && !data.routine_name) {
+      issues.push(markFieldError('field-routine_name'));
+    }
+
+    if (!data.reg_type) {
+      const id = data.is_title === 'yes' ? 'field-reg_type_title' : 'field-reg_type_nontitle';
+      issues.push(markFieldError(id));
+    }
+
+    return issues.filter(Boolean);
+  }
+
   async function submitForm() {
     const btn = document.getElementById('submit-btn');
     const err = document.getElementById('form-error');
@@ -394,17 +456,16 @@
     const fd   = new FormData(form);
     const data = Object.fromEntries(fd.entries());
 
-    // Validate required fields
-    const required = ['studio_name','first_name','last_name','gender','birth_date','email','phone'];
-    for (const f of required) {
-      if (!data[f]) {
-        showError(`Please fill in all required fields.`);
-        resetBtn(); return;
-      }
+    // Validate — highlight bad fields and focus the first one
+    const badFields = validateForm(data);
+    if (badFields.length) {
+      const first = badFields[0];
+      first.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      const input = first.querySelector('input:not([type=hidden]):not([type=radio]), select, textarea');
+      if (input) setTimeout(() => input.focus(), 300);
+      showError('Please fill in all highlighted fields before continuing.');
+      resetBtn(); return;
     }
-    if (!data.is_title) { showError('Please select Yes or No for Title registration.'); resetBtn(); return; }
-    if (data.is_title === 'yes' && !data.routine_name) { showError('Please enter your routine name.'); resetBtn(); return; }
-    if (!data.reg_type) { showError('Please select which events you are participating in.'); resetBtn(); return; }
 
     // Tokenize payment if needed
     if (data.is_title === 'no') {
@@ -449,6 +510,12 @@
     btn.disabled = false;
     btn.innerHTML = 'Complete Registration';
   }
+
+  // Clear field error highlight as soon as user corrects it
+  document.querySelectorAll('#reg-form input, #reg-form select, #reg-form textarea').forEach(el => {
+    el.addEventListener('input', () => el.closest('.field')?.classList.remove('field-error'));
+    el.addEventListener('change', () => el.closest('.field')?.classList.remove('field-error'));
+  });
 
 </script>
 </body>
