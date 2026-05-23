@@ -555,6 +555,16 @@ def admin_upload_process():
 # ── INIT DB ──
 with app.app_context():
     db.create_all()
+    # Add columns introduced after initial deploy (ALTER TABLE is idempotent via try/except)
+    with db.engine.connect() as _conn:
+        for _col_sql in [
+            'ALTER TABLE registration ADD COLUMN studio_email VARCHAR(200)',
+        ]:
+            try:
+                _conn.execute(db.text(_col_sql))
+                _conn.commit()
+            except Exception:
+                _conn.rollback()  # column already exists — ignore
 
 if __name__ == '__main__':
     app.run(debug=True)
