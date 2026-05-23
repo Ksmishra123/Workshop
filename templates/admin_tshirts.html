@@ -1,0 +1,230 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>T-Shirt Order — On Stage America</title>
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: Arial, Helvetica, sans-serif; background: #fff; color: #1A1814; padding: 32px; -webkit-font-smoothing: antialiased; }
+
+  /* Screen-only top bar */
+  .screen-bar { display: flex; align-items: center; gap: 16px; margin-bottom: 32px; padding-bottom: 20px; border-bottom: 2px solid #DDD9D0; }
+  .screen-bar a { padding: 8px 16px; background: #111; color: #fff; border-radius: 8px; text-decoration: none; font-size: 13px; font-weight: 700; }
+  .print-btn { background: #B8952A !important; }
+  .screen-bar-title { font-size: 18px; font-weight: 700; flex: 1; }
+
+  /* Document header */
+  .doc-header { display: flex; align-items: flex-start; justify-content: space-between; margin-bottom: 28px; }
+  .doc-logo { height: 56px; width: auto; }
+  .doc-meta { text-align: right; }
+  .doc-meta h1 { font-size: 22px; font-weight: 700; margin-bottom: 4px; }
+  .doc-meta .doc-date { font-size: 13px; color: #8A8780; }
+
+  /* Divider stripe */
+  .stripe { height: 3px; background: linear-gradient(90deg,#C9A84C 0%,#e8c96a 50%,#C9A84C 100%); margin-bottom: 28px; }
+
+  /* Summary totals */
+  .summary-grid { display: grid; grid-template-columns: repeat(8, 1fr); gap: 0; border: 2px solid #111; border-radius: 12px; overflow: hidden; margin-bottom: 32px; }
+  .summary-cell { padding: 18px 10px; text-align: center; border-right: 1px solid #DDD9D0; }
+  .summary-cell:last-child { border-right: none; }
+  .summary-cell.total-cell { background: #111; color: #fff; }
+  .size-label { font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.06em; color: #8A8780; margin-bottom: 8px; }
+  .total-cell .size-label { color: rgba(255,255,255,0.6); }
+  .size-count { font-size: 32px; font-weight: 700; font-family: 'Courier New', monospace; line-height: 1; }
+  .zero { color: #DDD9D0; }
+  .total-cell .size-count { color: #C9A84C; }
+
+  /* Size group labels */
+  .group-label { font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.1em; color: #8A8780; margin-bottom: 8px; padding-left: 2px; }
+  .group-block { margin-bottom: 24px; }
+  .group-row { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; }
+  .group-card { border: 1.5px solid #DDD9D0; border-radius: 10px; padding: 14px; text-align: center; }
+  .group-card.has-count { border-color: #111; background: #F9F4E8; }
+  .group-card .size-label { color: #5A5750; }
+  .group-card .size-count { font-size: 36px; }
+
+  /* Order box for vendor */
+  .order-box { border: 2px dashed #B8952A; border-radius: 12px; padding: 20px 24px; margin-bottom: 32px; }
+  .order-box h2 { font-size: 14px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.08em; color: #B8952A; margin-bottom: 12px; }
+  .order-table { width: 100%; border-collapse: collapse; font-size: 14px; }
+  .order-table th { text-align: left; font-size: 11px; text-transform: uppercase; letter-spacing: 0.06em; color: #8A8780; padding: 6px 10px; border-bottom: 1px solid #DDD9D0; }
+  .order-table td { padding: 9px 10px; border-bottom: 1px solid #F0EDE6; vertical-align: middle; }
+  .order-table tr:last-child td { border-bottom: none; }
+  .order-table .count-cell { font-family: 'Courier New', monospace; font-size: 16px; font-weight: 700; }
+  .order-table .zero-row td { color: #C8C4BC; }
+  .order-table tfoot td { font-weight: 700; border-top: 2px solid #111; padding-top: 12px; }
+
+  /* Per-studio breakdown */
+  .studio-section h2 { font-size: 14px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.08em; color: #5A5750; margin-bottom: 14px; }
+  .studio-table { width: 100%; border-collapse: collapse; font-size: 13px; margin-bottom: 24px; }
+  .studio-table th { background: #111; color: rgba(255,255,255,0.75); padding: 9px 12px; text-align: left; font-size: 11px; text-transform: uppercase; letter-spacing: 0.06em; white-space: nowrap; }
+  .studio-table td { padding: 9px 12px; border-bottom: 1px solid #F0EDE6; }
+  .studio-table tbody tr:hover { background: #F9F4E8; }
+  .studio-table tfoot td { background: #F4F1EB; font-weight: 700; border-top: 2px solid #DDD9D0; }
+  .count-num { font-family: 'Courier New', monospace; font-weight: 700; text-align: center; }
+  .zero-num { color: #DDD9D0; }
+
+  /* Footer */
+  .doc-footer { margin-top: 40px; padding-top: 16px; border-top: 1px solid #DDD9D0; font-size: 11px; color: #8A8780; display: flex; justify-content: space-between; }
+
+  @media print {
+    .screen-bar { display: none !important; }
+    body { padding: 18px; }
+    .summary-grid { break-inside: avoid; }
+    .order-box { break-inside: avoid; }
+    .studio-section { break-inside: avoid; }
+    .studio-table { page-break-inside: auto; }
+    .studio-table tr { page-break-inside: avoid; }
+  }
+</style>
+</head>
+<body>
+
+<!-- Screen navigation (hidden on print) -->
+<div class="screen-bar">
+  <a href="/admin">← Dashboard</a>
+  <div class="screen-bar-title">T-Shirt Order Sheet</div>
+  <a href="#" class="print-btn" onclick="window.print();return false;">🖨 Print / Save PDF</a>
+</div>
+
+<!-- Document header -->
+<div class="doc-header">
+  <img src="/static/osa-logo.png" alt="On Stage America" class="doc-logo">
+  <div class="doc-meta">
+    <h1>T-Shirt Order Sheet</h1>
+    <div class="doc-date">Generated {{ now }}</div>
+    <div class="doc-date" style="margin-top:4px;font-weight:700;font-size:14px;">Total shirts needed: {{ total }}</div>
+  </div>
+</div>
+<div class="stripe"></div>
+
+<!-- SUMMARY GRID (all sizes at a glance) -->
+<div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:0.08em;color:#8A8780;margin-bottom:10px;">At a Glance</div>
+<div class="summary-grid">
+  {% for size in sizes %}
+  {% set count = tshirts[size] %}
+  <div class="summary-cell {% if loop.last %}total-cell{% endif %}">
+    <div class="size-label">{{ size.replace('Youth ','Y').replace('Adult ','A').replace('Extra Large','XL') }}</div>
+    <div class="size-count {% if count == 0 and not loop.last %}zero{% endif %}">{{ count }}</div>
+  </div>
+  {% endfor %}
+  <div class="summary-cell total-cell">
+    <div class="size-label">Total</div>
+    <div class="size-count">{{ total }}</div>
+  </div>
+</div>
+
+<!-- VENDOR ORDER BOX -->
+<div class="order-box">
+  <h2>Vendor Order — Send This to Your Supplier</h2>
+  <table class="order-table">
+    <thead>
+      <tr>
+        <th>Size</th>
+        <th>Category</th>
+        <th style="text-align:right;">Qty</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for size in sizes %}
+      {% set count = tshirts[size] %}
+      <tr class="{{ 'zero-row' if count == 0 else '' }}">
+        <td><strong>{{ size }}</strong></td>
+        <td style="color:#8A8780;">{{ 'Youth' if 'Youth' in size else 'Adult' }}</td>
+        <td class="count-cell" style="text-align:right;">{{ count if count > 0 else '—' }}</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+    <tfoot>
+      <tr>
+        <td colspan="2">TOTAL</td>
+        <td class="count-cell" style="text-align:right;">{{ total }}</td>
+      </tr>
+    </tfoot>
+  </table>
+</div>
+
+<!-- YOUTH / ADULT BREAKDOWN -->
+{% set youth_sizes = ['Youth Small','Youth Medium','Youth Large'] %}
+{% set adult_sizes = ['Adult Small','Adult Medium','Adult Large','Adult XL','Adult 2XL'] %}
+{% set youth_total = namespace(v=0) %}
+{% set adult_total = namespace(v=0) %}
+{% for s in youth_sizes %}{% set youth_total.v = youth_total.v + tshirts[s] %}{% endfor %}
+{% for s in adult_sizes %}{% set adult_total.v = adult_total.v + tshirts[s] %}{% endfor %}
+
+<div style="display:grid;grid-template-columns:1fr 1fr;gap:20px;margin-bottom:32px;">
+  <div class="group-block">
+    <div class="group-label">Youth — {{ youth_total.v }} shirts</div>
+    <div class="group-row" style="grid-template-columns:repeat(3,1fr);">
+      {% for size in youth_sizes %}
+      {% set count = tshirts[size] %}
+      <div class="group-card {{ 'has-count' if count > 0 else '' }}">
+        <div class="size-label">{{ size.replace('Youth ','') }}</div>
+        <div class="size-count {{ 'zero' if count == 0 else '' }}">{{ count }}</div>
+      </div>
+      {% endfor %}
+    </div>
+  </div>
+  <div class="group-block">
+    <div class="group-label">Adult — {{ adult_total.v }} shirts</div>
+    <div class="group-row" style="grid-template-columns:repeat(3,1fr);">
+      {% for size in adult_sizes %}
+      {% set count = tshirts[size] %}
+      <div class="group-card {{ 'has-count' if count > 0 else '' }}">
+        <div class="size-label">{{ size.replace('Adult ','') }}</div>
+        <div class="size-count {{ 'zero' if count == 0 else '' }}">{{ count }}</div>
+      </div>
+      {% endfor %}
+    </div>
+  </div>
+</div>
+
+<!-- PER-STUDIO BREAKDOWN -->
+{% if studios %}
+<div class="studio-section">
+  <h2>Per-Studio Breakdown</h2>
+  <table class="studio-table">
+    <thead>
+      <tr>
+        <th>Studio</th>
+        {% for size in sizes %}
+        <th style="text-align:center;">{{ size.replace('Youth ','Y').replace('Adult ','').replace(' ','') }}</th>
+        {% endfor %}
+        <th style="text-align:center;">Total</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for studio, counts in studios.items() %}
+      {% set row_total = namespace(v=0) %}
+      {% for s in sizes %}{% set row_total.v = row_total.v + counts.get(s,0) %}{% endfor %}
+      <tr>
+        <td>{{ studio or '—' }}</td>
+        {% for size in sizes %}
+        {% set n = counts.get(size, 0) %}
+        <td class="count-num {{ 'zero-num' if n == 0 else '' }}">{{ n if n > 0 else '—' }}</td>
+        {% endfor %}
+        <td class="count-num"><strong>{{ row_total.v }}</strong></td>
+      </tr>
+      {% endfor %}
+    </tbody>
+    <tfoot>
+      <tr>
+        <td><strong>TOTAL</strong></td>
+        {% for size in sizes %}
+        <td class="count-num"><strong>{{ tshirts[size] }}</strong></td>
+        {% endfor %}
+        <td class="count-num"><strong>{{ total }}</strong></td>
+      </tr>
+    </tfoot>
+  </table>
+</div>
+{% endif %}
+
+<div class="doc-footer">
+  <span>On Stage America · osa@onstageamerica.com · 301-654-8939</span>
+  <span>Printed {{ now }}</span>
+</div>
+
+</body>
+</html>

@@ -74,6 +74,22 @@
   .mono { font-family: 'Courier New', monospace; font-size: 11px; color: var(--light); }
   .empty { text-align: center; padding: 48px; color: var(--muted); font-size: 14px; }
 
+  /* T-shirt summary */
+  .tshirt-section { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-lg); box-shadow: var(--shadow); margin-bottom: 28px; overflow: hidden; }
+  .tshirt-header { background: var(--forest); padding: 14px 20px; display: flex; align-items: center; gap: 12px; }
+  .tshirt-header-title { font-size: 12px; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; color: rgba(255,255,255,0.8); flex: 1; }
+  .tshirt-print-btn { background: var(--gold); border: none; color: #1A1814; padding: 6px 14px; border-radius: 6px; font-size: 12px; font-weight: 700; cursor: pointer; font-family: Arial, sans-serif; text-decoration: none; }
+  .tshirt-print-btn:hover { opacity: 0.88; }
+  .tshirt-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(120px, 1fr)); gap: 0; }
+  .tshirt-cell { padding: 16px 18px; border-right: 1px solid var(--border); border-bottom: 1px solid var(--border); text-align: center; }
+  .tshirt-cell:last-child { border-right: none; }
+  .tshirt-size-label { font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.06em; color: var(--light); margin-bottom: 6px; }
+  .tshirt-count { font-size: 28px; font-weight: 700; font-family: 'Courier New', monospace; color: var(--text); line-height: 1; }
+  .tshirt-count.zero { color: var(--border); }
+  .tshirt-total-row { padding: 12px 20px; border-top: 2px solid var(--border); background: var(--surface2); display: flex; align-items: center; gap: 8px; font-size: 13px; }
+  .tshirt-total-row strong { font-size: 15px; }
+  @media (max-width: 768px) { .tshirt-grid { grid-template-columns: repeat(4, 1fr); } }
+
   @media (max-width: 768px) {
     .stats-grid { grid-template-columns: repeat(2, 1fr); }
     .main { padding: 16px; }
@@ -140,6 +156,20 @@
     <div class="stat-card">
       <div class="stat-label">Not Yet Checked In</div>
       <div class="stat-val" id="s-pending2">—</div>
+    </div>
+  </div>
+
+  <!-- T-SHIRT ORDER -->
+  <div class="tshirt-section">
+    <div class="tshirt-header">
+      <div class="tshirt-header-title">👕 T-Shirt Order Summary</div>
+      <a href="/admin/tshirts" target="_blank" class="tshirt-print-btn">🖨 Print Order Sheet</a>
+    </div>
+    <div class="tshirt-grid" id="tshirt-grid">
+      <!-- populated by JS -->
+    </div>
+    <div class="tshirt-total-row">
+      Total shirts: <strong id="tshirt-total">—</strong>
     </div>
   </div>
 
@@ -254,6 +284,21 @@
       document.getElementById('s-opening').textContent  = d.opening;
       document.getElementById('s-both').textContent     = d.both;
       document.getElementById('s-pending2').textContent = d.pending;
+      // T-shirt grid
+      if (d.tshirts) {
+        const labels = { 'Youth Small':'YS','Youth Medium':'YM','Youth Large':'YL',
+                         'Adult Small':'AS','Adult Medium':'AM','Adult Large':'AL',
+                         'Adult XL':'AXL','Adult 2XL':'2XL' };
+        const grid = document.getElementById('tshirt-grid');
+        grid.innerHTML = Object.entries(d.tshirts).map(([size, count]) =>
+          `<div class="tshirt-cell">
+            <div class="tshirt-size-label">${labels[size]||size}</div>
+            <div class="tshirt-count${count===0?' zero':''}">${count}</div>
+           </div>`
+        ).join('');
+        document.getElementById('tshirt-total').textContent =
+          Object.values(d.tshirts).reduce((a,b)=>a+b,0);
+      }
       const now = new Date();
       document.getElementById('last-updated').textContent =
         'Updated ' + now.toLocaleTimeString([], {hour:'2-digit', minute:'2-digit', second:'2-digit'});

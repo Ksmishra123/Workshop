@@ -389,6 +389,9 @@ def admin():
                            title=title,
                            revenue=revenue)
 
+TSHIRT_SIZES = ['Youth Small','Youth Medium','Youth Large',
+                'Adult Small','Adult Medium','Adult Large','Adult XL','Adult 2XL']
+
 @app.route('/admin/stats')
 def admin_stats():
     if not session.get('admin'):
@@ -401,6 +404,7 @@ def admin_stats():
     workshop = sum(1 for r in regs if r.reg_type == 'workshop')
     opening  = sum(1 for r in regs if r.reg_type == 'opening')
     both     = sum(1 for r in regs if r.reg_type == 'both')
+    tshirts  = {s: sum(1 for r in regs if r.tshirt_size == s) for s in TSHIRT_SIZES}
     return jsonify({
         'total':    total,
         'checked':  checked,
@@ -410,7 +414,27 @@ def admin_stats():
         'workshop': workshop,
         'opening':  opening,
         'both':     both,
+        'tshirts':  tshirts,
     })
+
+@app.route('/admin/tshirts')
+def admin_tshirts():
+    if not session.get('admin'):
+        return redirect(url_for('admin_login'))
+    regs = Registration.query.all()
+    tshirts = {s: sum(1 for r in regs if r.tshirt_size == s) for s in TSHIRT_SIZES}
+    total   = sum(tshirts.values())
+    # Per-studio breakdown
+    studios = {}
+    for r in regs:
+        if r.tshirt_size:
+            studios.setdefault(r.studio_name, {})
+            studios[r.studio_name][r.tshirt_size] = studios[r.studio_name].get(r.tshirt_size, 0) + 1
+    studios = dict(sorted(studios.items()))
+    now = datetime.utcnow().strftime('%B %d, %Y at %I:%M %p UTC')
+    return render_template('admin_tshirts.html',
+                           tshirts=tshirts, total=total,
+                           sizes=TSHIRT_SIZES, studios=studios, now=now)
 
 @app.route('/admin/login', methods=['GET', 'POST'])
 def admin_login():
