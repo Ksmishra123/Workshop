@@ -8,10 +8,10 @@
 <style>
   *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
   :root {
-    --forest:#1E3A0F; --green:#2D5016; --green-mid:#4A7A26;
-    --green-light:#EBF3E0; --gold:#C9A84C;
+    --forest:#111111; --green:#1A1A1A; --green-mid:#B8952A;
+    --green-light:#F9F4E8; --gold:#C9A84C;
     --text:#1A1814; --muted:#5A5750; --light:#8A8780;
-    --border:#DDD9D0; --bg:#F2EFE8; --surface:#fff; --surface2:#F4F1EB;
+    --border:#DDD9D0; --bg:#F5F2EC; --surface:#fff; --surface2:#F4F1EB;
     --success:#1A5A2A; --success-light:#E8F5EC; --success-border:#B8DCC4;
     --warn:#7A4A00; --warn-light:#FFF3DC;
     --danger:#7A1A1A; --danger-light:#FCEAEA;
@@ -31,7 +31,7 @@
   .hstat-val.green { color: #6FCF3A; }
   .hstat-label { font-size: 9px; text-transform: uppercase; letter-spacing: 0.08em; color: rgba(255,255,255,0.35); margin-top: 2px; }
   .clock { font-family: 'Courier New', monospace; font-size: 13px; color: rgba(255,255,255,0.4); }
-  .stripe { height: 3px; background: linear-gradient(90deg,var(--gold) 0%,var(--green-mid) 50%,var(--gold) 100%); flex-shrink: 0; }
+  .stripe { height: 3px; background: linear-gradient(90deg,var(--gold) 0%,#e8c96a 50%,var(--gold) 100%); flex-shrink: 0; }
   .main { flex: 1; overflow-y: auto; display: flex; align-items: flex-start; justify-content: center; padding: 24px 20px 40px; }
   .wrap { width: 100%; max-width: 640px; }
   .screen { display: none; }
@@ -132,7 +132,7 @@
 <body>
 
 <div class="header">
-  <div class="header-logo">On Stage America</div>
+  <img src="/static/osa-logo.png" alt="On Stage America" style="height:30px;width:auto;filter:brightness(0) invert(1);">
   <div class="header-div"></div>
   <div class="header-title">Event Check-In</div>
   <div class="header-right">

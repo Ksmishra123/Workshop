@@ -7,10 +7,10 @@
 <style>
   *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
   :root {
-    --forest:#1E3A0F; --green:#2D5016; --green-mid:#4A7A26;
-    --green-light:#EBF3E0; --gold:#C9A84C;
+    --forest:#111111; --green:#1A1A1A; --green-mid:#B8952A;
+    --green-light:#F9F4E8; --gold:#C9A84C;
     --text:#1A1814; --muted:#5A5750; --light:#8A8780;
-    --border:#DDD9D0; --bg:#F2EFE8; --surface:#fff;
+    --border:#DDD9D0; --bg:#F5F2EC; --surface:#fff;
     --success:#1A5A2A; --success-light:#E8F5EC; --success-border:#B8DCC4;
     --radius:10px; --radius-lg:16px;
   }
@@ -22,7 +22,7 @@
   .header-sub { font-size: 14px; color: rgba(255,255,255,0.5); }
   .header-badge { display: inline-flex; align-items: center; gap: 8px; background: rgba(255,255,255,0.1); border: 1px solid rgba(255,255,255,0.15); border-radius: 100px; padding: 6px 14px; margin-top: 16px; font-size: 13px; color: rgba(255,255,255,0.85); }
   .badge-dot { width: 8px; height: 8px; border-radius: 50%; background: #6FCF3A; flex-shrink: 0; }
-  .stripe { height: 3px; background: linear-gradient(90deg, var(--gold) 0%, var(--green-mid) 50%, var(--gold) 100%); }
+  .stripe { height: 3px; background: linear-gradient(90deg, var(--gold) 0%, #e8c96a 50%, var(--gold) 100%); }
   .card-body { background: var(--surface); border-radius: 0 0 var(--radius-lg) var(--radius-lg); padding: 36px; box-shadow: 0 4px 24px rgba(0,0,0,0.08); }
   .greeting { font-family: Georgia, serif; font-size: 22px; margin-bottom: 10px; }
   .intro { font-size: 14px; color: var(--muted); line-height: 1.75; margin-bottom: 28px; }
@@ -67,7 +67,7 @@
 <body>
 <div class="wrap">
   <div class="card-header">
-    <div class="eyebrow">On Stage America</div>
+    <img src="/static/osa-logo.png" alt="On Stage America" style="height:52px;width:auto;display:block;margin-bottom:18px;filter:brightness(0) invert(1);">
     <div class="header-title">You're Registered!</div>
     <div class="header-sub">Workshop Registration Confirmed</div>
     <div class="header-badge">

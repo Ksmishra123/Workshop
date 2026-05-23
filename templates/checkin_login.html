@@ -6,26 +6,25 @@
 <title>OSA Check-In — Sign In</title>
 <style>
   *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
-  body { font-family: Arial, Helvetica, sans-serif; background: #F2EFE8; display: flex; align-items: center; justify-content: center; min-height: 100vh; padding: 20px; -webkit-font-smoothing: antialiased; }
+  body { font-family: Arial, Helvetica, sans-serif; background: #F5F2EC; display: flex; align-items: center; justify-content: center; min-height: 100vh; padding: 20px; -webkit-font-smoothing: antialiased; }
   .card { background: #fff; border-radius: 16px; width: 100%; max-width: 360px; box-shadow: 0 8px 32px rgba(0,0,0,0.1); overflow: hidden; }
-  .card-header { background: #1E3A0F; padding: 28px 32px 24px; text-align: center; }
-  .stripe { height: 3px; background: linear-gradient(90deg, #C9A84C 0%, #4A7A26 50%, #C9A84C 100%); }
-  .eyebrow { font-size: 10px; font-weight: 700; letter-spacing: 0.16em; text-transform: uppercase; color: #C9A84C; margin-bottom: 10px; }
+  .card-header { background: #111111; padding: 28px 32px 24px; text-align: center; }
+  .stripe { height: 3px; background: linear-gradient(90deg, #C9A84C 0%, #e8c96a 50%, #C9A84C 100%); }
   .card-title { font-family: Georgia, serif; font-size: 26px; color: #fff; margin-bottom: 4px; line-height: 1.2; }
   .card-sub { font-size: 13px; color: rgba(255,255,255,0.45); }
   .card-body { padding: 28px 32px 32px; }
   label { display: block; font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.06em; color: #5A5750; margin-bottom: 6px; }
   input[type=password] { width: 100%; padding: 13px 14px; border: 1.5px solid #DDD9D0; border-radius: 10px; font-size: 16px; font-family: Arial, sans-serif; outline: none; margin-bottom: 14px; color: #1A1814; background: #fff; transition: border-color 0.15s; }
-  input[type=password]:focus { border-color: #4A7A26; }
-  button { width: 100%; padding: 14px; background: #2D5016; color: #fff; border: none; border-radius: 10px; font-size: 15px; font-weight: 700; cursor: pointer; font-family: Arial, sans-serif; transition: background 0.15s; }
-  button:hover { background: #1E3A0F; }
+  input[type=password]:focus { border-color: #B8952A; }
+  button { width: 100%; padding: 14px; background: #B8952A; color: #fff; border: none; border-radius: 10px; font-size: 15px; font-weight: 700; cursor: pointer; font-family: Arial, sans-serif; transition: background 0.15s; }
+  button:hover { background: #96791e; }
   .error { background: #FCEAEA; border: 1px solid #E8B4B4; border-radius: 8px; padding: 10px 14px; font-size: 13px; color: #7A1A1A; margin-bottom: 14px; }
 </style>
 </head>
 <body>
 <div class="card">
   <div class="card-header">
-    <div class="eyebrow">On Stage America</div>
+    <img src="/static/osa-logo.png" alt="On Stage America" style="height:52px;width:auto;display:block;margin:0 auto 16px;filter:brightness(0) invert(1);">
     <div class="card-title">Event Check-In</div>
     <div class="card-sub">Staff access only</div>
   </div>
