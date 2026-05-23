@@ -221,7 +221,7 @@ def submit_registration():
 
     # Create registration record
     reg = Registration(
-        studio_name  = data.get('studio_name', '').strip(),
+        studio_name  = ' '.join(data.get('studio_name', '').strip().split()),
         first_name   = data.get('first_name', '').strip(),
         last_name    = data.get('last_name', '').strip(),
         gender       = data.get('gender', '').strip(),
@@ -478,6 +478,42 @@ def admin_export():
     return Response(generate(), mimetype='text/csv',
                     headers={'Content-Disposition': 'attachment; filename=osa_registrations.csv'})
 
+# ── STUDIO AUTOCOMPLETE (public — used by registration form) ──
+@app.route('/api/studios')
+def api_studios():
+    rows = db.session.execute(
+        db.text("SELECT DISTINCT studio_name FROM registration WHERE studio_name IS NOT NULL AND studio_name != '' ORDER BY studio_name")
+    ).fetchall()
+    return jsonify([r[0] for r in rows])
+
+# ── STUDIO ADMIN ROUTES ──
+@app.route('/admin/studios')
+def admin_studios():
+    if not session.get('admin'):
+        abort(403)
+    rows = db.session.execute(db.text(
+        "SELECT studio_name, COUNT(*) as cnt FROM registration "
+        "WHERE studio_name IS NOT NULL AND studio_name != '' "
+        "GROUP BY studio_name ORDER BY studio_name"
+    )).fetchall()
+    return jsonify([{'name': r[0], 'count': r[1]} for r in rows])
+
+@app.route('/admin/studio/rename', methods=['POST'])
+def admin_studio_rename():
+    if not session.get('admin'):
+        abort(403)
+    data     = request.get_json()
+    old_name = (data.get('old_name') or '').strip()
+    new_name = ' '.join((data.get('new_name') or '').strip().split())
+    if not old_name or not new_name:
+        return jsonify({'error': 'Missing name'}), 400
+    result = db.session.execute(
+        db.text("UPDATE registration SET studio_name = :new WHERE studio_name = :old"),
+        {'new': new_name, 'old': old_name}
+    )
+    db.session.commit()
+    return jsonify({'updated': result.rowcount, 'new_name': new_name})
+
 # ── CSV TEMPLATE DOWNLOAD ──
 @app.route('/registration-template.csv')
 def registration_template():
@@ -549,7 +585,7 @@ def admin_upload_process():
         amount = 0 if is_title else PRICES.get(reg_type, 0)
 
         reg = Registration(
-            studio_name   = row.get('studio_name', ''),
+            studio_name   = ' '.join(row.get('studio_name', '').strip().split()),
             first_name    = first,
             last_name     = last,
             gender        = row.get('gender', ''),

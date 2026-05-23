@@ -74,6 +74,26 @@
   .mono { font-family: 'Courier New', monospace; font-size: 11px; color: var(--light); }
   .empty { text-align: center; padding: 48px; color: var(--muted); font-size: 14px; }
 
+  /* Studio manager */
+  .studio-manager { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-lg); box-shadow: var(--shadow); margin-bottom: 28px; overflow: hidden; }
+  .studio-manager-header { background: var(--forest); padding: 13px 20px; display: flex; align-items: center; gap: 10px; }
+  .studio-manager-title { font-size: 12px; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; color: rgba(255,255,255,0.8); flex: 1; }
+  .studio-manager-toggle { background: rgba(255,255,255,0.12); border: 1px solid rgba(255,255,255,0.2); color: rgba(255,255,255,0.8); padding: 5px 12px; border-radius: 6px; font-size: 12px; cursor: pointer; font-family: Arial, sans-serif; }
+  .studio-manager-body { display: none; padding: 0; }
+  .studio-manager-body.open { display: block; }
+  .studio-row { display: flex; align-items: center; gap: 10px; padding: 10px 16px; border-bottom: 1px solid var(--border); }
+  .studio-row:last-child { border-bottom: none; }
+  .studio-row-name { flex: 1; font-size: 14px; font-weight: 600; }
+  .studio-row-count { font-size: 12px; color: var(--light); min-width: 60px; }
+  .studio-rename-input { flex: 1; padding: 6px 10px; border: 1.5px solid var(--border); border-radius: 6px; font-size: 13px; font-family: Arial, sans-serif; outline: none; display: none; }
+  .studio-rename-input.show { display: block; }
+  .studio-btn { padding: 5px 11px; border-radius: 6px; font-size: 12px; font-weight: 700; cursor: pointer; border: none; font-family: Arial, sans-serif; }
+  .studio-btn.edit { background: var(--surface2); color: var(--muted); border: 1px solid var(--border); }
+  .studio-btn.save { background: var(--gold); color: #1A1814; display: none; }
+  .studio-btn.cancel { background: var(--surface2); color: var(--muted); border: 1px solid var(--border); display: none; }
+  .studio-btn.show { display: inline-block; }
+  .studio-empty { padding: 20px; text-align: center; color: var(--light); font-size: 13px; }
+
   /* T-shirt summary */
   .tshirt-section { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-lg); box-shadow: var(--shadow); margin-bottom: 28px; overflow: hidden; }
   .tshirt-header { background: var(--forest); padding: 14px 20px; display: flex; align-items: center; gap: 12px; }
@@ -156,6 +176,17 @@
     <div class="stat-card">
       <div class="stat-label">Not Yet Checked In</div>
       <div class="stat-val" id="s-pending2">—</div>
+    </div>
+  </div>
+
+  <!-- STUDIO MANAGER -->
+  <div class="studio-manager">
+    <div class="studio-manager-header">
+      <div class="studio-manager-title">🏫 Studio Names</div>
+      <button class="studio-manager-toggle" onclick="toggleStudios()">Show</button>
+    </div>
+    <div class="studio-manager-body" id="studio-manager-body">
+      <div id="studio-list-admin"><div class="studio-empty">Loading…</div></div>
     </div>
   </div>
 
@@ -307,6 +338,72 @@
 
   refreshStats();
   setInterval(refreshStats, 30000);
+
+  // ── Studio manager ──
+  let studiosLoaded = false;
+  function toggleStudios() {
+    const body = document.getElementById('studio-manager-body');
+    const btn  = document.querySelector('.studio-manager-toggle');
+    const open = body.classList.toggle('open');
+    btn.textContent = open ? 'Hide' : 'Show';
+    if (open && !studiosLoaded) loadStudios();
+  }
+
+  async function loadStudios() {
+    const res   = await fetch('/admin/studios');
+    const list  = await res.json();
+    studiosLoaded = true;
+    const el    = document.getElementById('studio-list-admin');
+    if (!list.length) { el.innerHTML = '<div class="studio-empty">No studios yet.</div>'; return; }
+    el.innerHTML = list.map(s =>
+      `<div class="studio-row" id="srow-${CSS.escape(s.name)}">
+        <div class="studio-row-name" id="sname-${CSS.escape(s.name)}">${s.name}</div>
+        <div class="studio-row-count">${s.count} registrant${s.count!==1?'s':''}</div>
+        <input class="studio-rename-input" id="sinput-${CSS.escape(s.name)}" value="${s.name.replace(/"/g,'&quot;')}">
+        <button class="studio-btn edit" onclick="editStudio('${s.name.replace(/'/g,"\\'")}')">Rename</button>
+        <button class="studio-btn save" id="ssave-${CSS.escape(s.name)}" onclick="saveStudio('${s.name.replace(/'/g,"\\'")}')">Save</button>
+        <button class="studio-btn cancel" id="scancel-${CSS.escape(s.name)}" onclick="cancelStudio('${s.name.replace(/'/g,"\\'")}')">Cancel</button>
+      </div>`
+    ).join('');
+  }
+
+  function editStudio(name) {
+    const k = CSS.escape(name);
+    document.getElementById('sname-' + k).style.display   = 'none';
+    document.getElementById('sinput-' + k).classList.add('show');
+    document.getElementById('ssave-' + k).classList.add('show');
+    document.getElementById('scancel-' + k).classList.add('show');
+    document.querySelector(`#srow-${k} .studio-btn.edit`).style.display = 'none';
+    document.getElementById('sinput-' + k).focus();
+  }
+
+  function cancelStudio(name) {
+    const k = CSS.escape(name);
+    document.getElementById('sname-' + k).style.display   = '';
+    document.getElementById('sinput-' + k).classList.remove('show');
+    document.getElementById('ssave-' + k).classList.remove('show');
+    document.getElementById('scancel-' + k).classList.remove('show');
+    document.querySelector(`#srow-${k} .studio-btn.edit`).style.display = '';
+    document.getElementById('sinput-' + k).value = name;
+  }
+
+  async function saveStudio(oldName) {
+    const k       = CSS.escape(oldName);
+    const newName = document.getElementById('sinput-' + k).value.trim();
+    if (!newName || newName === oldName) { cancelStudio(oldName); return; }
+    const res  = await fetch('/admin/studio/rename', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ old_name: oldName, new_name: newName })
+    });
+    const data = await res.json();
+    if (data.updated !== undefined) {
+      studiosLoaded = false;
+      loadStudios();
+    } else {
+      alert('Error: ' + (data.error || 'Could not rename studio'));
+    }
+  }
 </script>
 </body>
 </html>

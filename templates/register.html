@@ -122,6 +122,23 @@
     .col-span-2 { grid-column: span 1; }
     .form-card, .page-header { padding: 24px 20px; }
   }
+
+  /* Studio autocomplete */
+  .autocomplete-wrap { position: relative; }
+  .autocomplete-list {
+    position: absolute; top: calc(100% + 4px); left: 0; right: 0; z-index: 100;
+    background: var(--surface); border: 1.5px solid var(--green-mid);
+    border-radius: var(--radius); box-shadow: 0 6px 24px rgba(0,0,0,0.12);
+    max-height: 220px; overflow-y: auto; display: none;
+  }
+  .autocomplete-list.open { display: block; }
+  .autocomplete-item {
+    padding: 10px 14px; font-size: 14px; cursor: pointer;
+    border-bottom: 1px solid var(--border);
+  }
+  .autocomplete-item:last-child { border-bottom: none; }
+  .autocomplete-item:hover, .autocomplete-item.active { background: var(--green-light); }
+  .autocomplete-item mark { background: none; color: var(--green-mid); font-weight: 700; }
 </style>
 </head>
 <body>
@@ -146,7 +163,10 @@
       <div class="grid-2">
         <div class="field" id="field-studio_name">
           <label>Studio Name <span class="req">*</span></label>
-          <input type="text" name="studio_name" required placeholder="Studio name">
+          <div class="autocomplete-wrap">
+            <input type="text" name="studio_name" id="studio_name_input" required placeholder="Start typing your studio name…" autocomplete="off">
+            <div class="autocomplete-list" id="studio-list"></div>
+          </div>
           <span class="field-error-msg">Studio name is required</span>
         </div>
         <div class="field" id="field-gender">
@@ -515,6 +535,76 @@
   document.querySelectorAll('#reg-form input, #reg-form select, #reg-form textarea').forEach(el => {
     el.addEventListener('input', () => el.closest('.field')?.classList.remove('field-error'));
     el.addEventListener('change', () => el.closest('.field')?.classList.remove('field-error'));
+  });
+
+  // ── Studio autocomplete ──
+  let studioNames = [];
+  fetch('/api/studios').then(r => r.json()).then(d => { studioNames = d; });
+
+  const studioInput = document.getElementById('studio_name_input');
+  const studioList  = document.getElementById('studio-list');
+  let activeIdx = -1;
+
+  function studioMatch(name, q) {
+    // Returns index of match position for highlighting, or -1
+    return name.toLowerCase().indexOf(q.toLowerCase());
+  }
+
+  function renderStudioList(q) {
+    if (!q || q.length < 1) { closeStudioList(); return; }
+    const matches = studioNames.filter(n => studioMatch(n, q) >= 0);
+    if (!matches.length) { closeStudioList(); return; }
+    activeIdx = -1;
+    studioList.innerHTML = matches.map((name, i) => {
+      const pos = studioMatch(name, q);
+      const highlighted = name.slice(0, pos)
+        + '<mark>' + name.slice(pos, pos + q.length) + '</mark>'
+        + name.slice(pos + q.length);
+      return `<div class="autocomplete-item" data-val="${name.replace(/"/g,'&quot;')}" data-idx="${i}">${highlighted}</div>`;
+    }).join('');
+    studioList.classList.add('open');
+  }
+
+  function closeStudioList() {
+    studioList.classList.remove('open');
+    studioList.innerHTML = '';
+    activeIdx = -1;
+  }
+
+  function setActive(idx) {
+    const items = studioList.querySelectorAll('.autocomplete-item');
+    items.forEach(el => el.classList.remove('active'));
+    if (idx >= 0 && idx < items.length) {
+      items[idx].classList.add('active');
+      items[idx].scrollIntoView({ block: 'nearest' });
+      activeIdx = idx;
+    } else {
+      activeIdx = -1;
+    }
+  }
+
+  studioInput.addEventListener('input', () => renderStudioList(studioInput.value));
+  studioInput.addEventListener('focus', () => renderStudioList(studioInput.value));
+
+  studioInput.addEventListener('keydown', e => {
+    const items = studioList.querySelectorAll('.autocomplete-item');
+    if (!items.length) return;
+    if (e.key === 'ArrowDown') { e.preventDefault(); setActive(Math.min(activeIdx + 1, items.length - 1)); }
+    else if (e.key === 'ArrowUp') { e.preventDefault(); setActive(Math.max(activeIdx - 1, 0)); }
+    else if (e.key === 'Enter' && activeIdx >= 0) {
+      e.preventDefault();
+      studioInput.value = items[activeIdx].dataset.val;
+      closeStudioList();
+    } else if (e.key === 'Escape') { closeStudioList(); }
+  });
+
+  studioList.addEventListener('mousedown', e => {
+    const item = e.target.closest('.autocomplete-item');
+    if (item) { studioInput.value = item.dataset.val; closeStudioList(); }
+  });
+
+  document.addEventListener('click', e => {
+    if (!studioInput.contains(e.target) && !studioList.contains(e.target)) closeStudioList();
   });
 
 </script>
