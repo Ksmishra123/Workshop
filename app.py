@@ -541,17 +541,6 @@ def admin_undo_checkin():
     db.session.commit()
     return jsonify({'success': True})
 
-@app.route('/admin/clear-all', methods=['POST'])
-def admin_clear_all():
-    if not session.get('admin'):
-        abort(403)
-    data = request.get_json()
-    if (data.get('confirm') or '').strip().upper() != 'CONFIRM':
-        return jsonify({'error': 'Confirmation phrase did not match'}), 400
-    count = Registration.query.count()
-    Registration.query.delete()
-    db.session.commit()
-    return jsonify({'deleted': count})
 
 @app.route('/admin/logout')
 def admin_logout():
