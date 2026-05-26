@@ -542,6 +542,73 @@ def admin_undo_checkin():
     return jsonify({'success': True})
 
 
+@app.route('/admin/send-email', methods=['POST'])
+def admin_send_email():
+    if not session.get('admin'):
+        abort(403)
+    sg_key = os.environ.get('SENDGRID_API_KEY')
+    if not sg_key:
+        return jsonify({'error': 'SendGrid API key not configured'}), 500
+
+    data    = request.get_json()
+    ids     = data.get('ids', [])
+    subject = (data.get('subject') or '').strip()
+    body    = (data.get('body') or '').strip()
+    if not ids or not subject or not body:
+        return jsonify({'error': 'Missing required fields'}), 400
+
+    regs = Registration.query.filter(Registration.id.in_(ids)).all()
+    # Paragraphs: split on double newline, single newlines become <br>
+    def text_to_html(t):
+        paras = t.split('\n\n')
+        return ''.join(f'<p style="margin:0 0 14px;font-family:Arial,Helvetica,sans-serif;font-size:14px;color:#5A5750;line-height:1.75;">{p.replace(chr(10),"<br>")}</p>' for p in paras)
+
+    body_html = text_to_html(body)
+    sent = skipped = 0
+    sg = SendGridAPIClient(sg_key)
+
+    for reg in regs:
+        to_email = (reg.email or '').strip() or (reg.studio_email or '').strip()
+        if not to_email:
+            skipped += 1
+            continue
+        html = f'''<!DOCTYPE html>
+<html><head><meta charset="UTF-8"></head>
+<body style="margin:0;padding:0;background:#F5F2EC;font-family:Arial,Helvetica,sans-serif;">
+<table width="100%" cellpadding="0" cellspacing="0" border="0" style="background:#F5F2EC;padding:32px 0 64px;">
+  <tr><td align="center">
+    <table width="600" cellpadding="0" cellspacing="0" border="0" style="max-width:600px;width:100%;">
+      <tr><td style="background:#111111;border-radius:16px 16px 0 0;padding:28px 36px 24px;">
+        <p style="margin:0 0 8px;font-size:10px;font-weight:bold;letter-spacing:0.16em;text-transform:uppercase;color:#C9A84C;">On Stage America</p>
+        <p style="margin:0;font-family:Georgia,serif;font-size:28px;color:#fff;line-height:1.2;">{subject}</p>
+      </td></tr>
+      <tr><td style="background:linear-gradient(90deg,#C9A84C,#e8c96a,#C9A84C);height:3px;font-size:0;">&nbsp;</td></tr>
+      <tr><td style="background:#fff;padding:32px 36px;">
+        <p style="margin:0 0 20px;font-family:Georgia,serif;font-size:18px;color:#1A1814;">Hi {reg.first_name},</p>
+        {body_html}
+      </td></tr>
+      <tr><td style="background:#1A1814;border-radius:0 0 16px 16px;padding:22px 36px;text-align:center;">
+        <p style="margin:0 0 4px;font-family:Georgia,serif;font-size:16px;color:rgba(255,255,255,0.8);">On Stage America</p>
+        <p style="margin:0;font-size:12px;color:rgba(255,255,255,0.3);">osa@onstageamerica.com &middot; 301-654-8939</p>
+      </td></tr>
+    </table>
+  </td></tr>
+</table>
+</body></html>'''
+        try:
+            sg.send(Mail(
+                from_email=('osa@onstageamerica.com', 'On Stage America'),
+                to_emails=to_email,
+                subject=subject,
+                html_content=html,
+            ))
+            sent += 1
+        except Exception as e:
+            print(f'Email to {to_email} failed: {e}')
+            skipped += 1
+
+    return jsonify({'sent': sent, 'skipped': skipped})
+
 @app.route('/admin/delete-selected', methods=['POST'])
 def admin_delete_selected():
     if not session.get('admin'):

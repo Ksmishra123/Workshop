@@ -110,6 +110,17 @@
   .wipe-input { width: 100%; padding: 11px 14px; border: 1.5px solid #E8B4B4; border-radius: 8px; font-size: 15px; font-family: 'Courier New', monospace; letter-spacing: 0.08em; outline: none; margin-top: 10px; }
   .wipe-input:focus { border-color: #B42828; }
 
+  /* Email compose modal */
+  .email-modal { max-width: 560px; }
+  .email-field { display: flex; flex-direction: column; gap: 5px; margin-bottom: 14px; }
+  .email-field label { font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.06em; color: var(--muted); }
+  .email-field input, .email-field textarea { padding: 10px 13px; border: 1.5px solid var(--border); border-radius: 8px; font-size: 14px; font-family: Arial, sans-serif; outline: none; color: var(--text); resize: vertical; }
+  .email-field input:focus, .email-field textarea:focus { border-color: var(--gold); }
+  .email-recipients { background: var(--green-light); border: 1px solid #DDD0A0; border-radius: 8px; padding: 9px 13px; font-size: 13px; color: var(--muted); margin-bottom: 14px; }
+  .email-recipients strong { color: var(--text); }
+  .send-progress { font-size: 13px; color: var(--muted); margin-top: 10px; display: none; }
+  .send-progress.show { display: block; }
+
   /* Studio manager */
   .studio-manager { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-lg); box-shadow: var(--shadow); margin-bottom: 28px; overflow: hidden; }
   .studio-manager-header { background: var(--forest); padding: 13px 20px; display: flex; align-items: center; gap: 10px; }
@@ -255,6 +266,7 @@
       <option value="in">Checked In</option>
       <option value="out">Not Checked In</option>
     </select>
+    <button class="filter-select" style="background:var(--forest);color:#fff;border-color:var(--forest);font-weight:700;cursor:pointer;" onclick="openEmailModal()">✉ Email</button>
   </div>
 
   <!-- SELECTION BAR -->
@@ -353,6 +365,28 @@
     <div class="modal-actions" id="wipe-actions">
       <button class="modal-btn danger" id="wipe-btn" onclick="doWipe()" disabled>Delete Everything</button>
       <button class="modal-btn cancel-btn" onclick="closeWipeModal()">Cancel</button>
+    </div>
+  </div>
+</div>
+
+<!-- EMAIL COMPOSE MODAL -->
+<div class="modal-overlay" id="email-modal" onclick="if(event.target===this)closeEmailModal()">
+  <div class="modal email-modal">
+    <div class="modal-name" style="margin-bottom:6px;">✉ Send Email</div>
+    <div class="email-recipients" id="email-recipients"></div>
+    <div class="email-field">
+      <label>Subject</label>
+      <input type="text" id="email-subject" placeholder="e.g. Important info about the workshop">
+    </div>
+    <div class="email-field">
+      <label>Message</label>
+      <textarea id="email-body" rows="8" placeholder="Write your message here…"></textarea>
+    </div>
+    <div class="modal-toast" id="email-toast"></div>
+    <div class="send-progress" id="send-progress"></div>
+    <div class="modal-actions" id="email-actions">
+      <button class="modal-btn confirm" id="email-send-btn" onclick="doSendEmail()">Send</button>
+      <button class="modal-btn cancel-btn" onclick="closeEmailModal()">Cancel</button>
     </div>
   </div>
 </div>
@@ -514,6 +548,68 @@
       return;
     }
     setTimeout(closeModal, 1200);
+  }
+
+  // ── Email compose ──
+  function getEmailTargetIds() {
+    // If rows are checked, use those; otherwise use all visible rows
+    const checked = [...document.querySelectorAll('#reg-table tbody .row-cb:checked')].map(cb => cb.value);
+    if (checked.length) return { ids: checked, scope: 'selected' };
+    const visible = [...document.querySelectorAll('#reg-table tbody tr')]
+      .filter(r => r.style.display !== 'none')
+      .map(r => r.querySelector('.row-cb').value);
+    return { ids: visible, scope: 'visible' };
+  }
+
+  function openEmailModal() {
+    const { ids, scope } = getEmailTargetIds();
+    if (!ids.length) { alert('No registrants match the current filter.'); return; }
+    const label = scope === 'selected'
+      ? `${ids.length} selected student${ids.length !== 1 ? 's' : ''}`
+      : `all ${ids.length} visible student${ids.length !== 1 ? 's' : ''}`;
+    document.getElementById('email-recipients').innerHTML =
+      `Sending to <strong>${label}</strong>${scope === 'visible' && document.getElementById('search').value ? ' (matching current filter)' : ''}.`;
+    document.getElementById('email-subject').value = '';
+    document.getElementById('email-body').value = '';
+    document.getElementById('email-toast').className = 'modal-toast';
+    document.getElementById('send-progress').className = 'send-progress';
+    document.getElementById('email-actions').style.display = '';
+    document.getElementById('email-modal').classList.add('show');
+    setTimeout(() => document.getElementById('email-subject').focus(), 100);
+  }
+
+  function closeEmailModal() {
+    document.getElementById('email-modal').classList.remove('show');
+  }
+
+  async function doSendEmail() {
+    const subject = document.getElementById('email-subject').value.trim();
+    const body    = document.getElementById('email-body').value.trim();
+    if (!subject) { document.getElementById('email-subject').focus(); return; }
+    if (!body)    { document.getElementById('email-body').focus(); return; }
+
+    const { ids } = getEmailTargetIds();
+    document.getElementById('email-actions').style.display = 'none';
+    const prog = document.getElementById('send-progress');
+    prog.textContent = `Sending to ${ids.length} recipient${ids.length !== 1 ? 's' : ''}…`;
+    prog.className = 'send-progress show';
+
+    const res  = await fetch('/admin/send-email', {
+      method: 'POST', headers: {'Content-Type':'application/json'},
+      body: JSON.stringify({ ids, subject, body })
+    });
+    const data = await res.json();
+    prog.className = 'send-progress';
+    const toast = document.getElementById('email-toast');
+    if (data.sent !== undefined) {
+      toast.textContent = `✓ Sent to ${data.sent} recipient${data.sent !== 1 ? 's' : ''}${data.skipped ? ` (${data.skipped} skipped — no email address)` : ''}.`;
+      toast.className = 'modal-toast success';
+      setTimeout(closeEmailModal, 2000);
+    } else {
+      toast.textContent = data.error || 'Something went wrong.';
+      toast.className = 'modal-toast error';
+      document.getElementById('email-actions').style.display = '';
+    }
   }
 
   // ── Row selection & delete ──
