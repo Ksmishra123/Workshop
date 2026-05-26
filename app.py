@@ -446,6 +446,42 @@ def admin_login():
         error = 'Incorrect password'
     return render_template('admin_login.html', error=error)
 
+@app.route('/admin/checkin', methods=['POST'])
+def admin_checkin():
+    if not session.get('admin'):
+        abort(403)
+    data   = request.get_json()
+    reg_id = (data.get('id') or '').strip()
+    reg    = db.session.get(Registration, reg_id)
+    if not reg:
+        return jsonify({'error': 'Registration not found'}), 404
+    if reg.checked_in:
+        return jsonify({
+            'already': True,
+            'checkin_time': reg.checkin_time.strftime('%I:%M %p'),
+            'checkin_date': reg.checkin_time.strftime('%m/%d/%Y'),
+        })
+    reg.checked_in   = True
+    reg.checkin_time = datetime.utcnow()
+    reg.checkin_by   = 'Admin'
+    db.session.commit()
+    return jsonify({'success': True, 'checkin_time': reg.checkin_time.strftime('%I:%M %p')})
+
+@app.route('/admin/undo-checkin', methods=['POST'])
+def admin_undo_checkin():
+    if not session.get('admin'):
+        abort(403)
+    data   = request.get_json()
+    reg_id = (data.get('id') or '').strip()
+    reg    = db.session.get(Registration, reg_id)
+    if not reg:
+        return jsonify({'error': 'Registration not found'}), 404
+    reg.checked_in   = False
+    reg.checkin_time = None
+    reg.checkin_by   = None
+    db.session.commit()
+    return jsonify({'success': True})
+
 @app.route('/admin/logout')
 def admin_logout():
     session.pop('admin', None)

@@ -73,6 +73,25 @@
   .badge.out { background: var(--surface2); color: var(--light); border: 1px solid var(--border); }
   .mono { font-family: 'Courier New', monospace; font-size: 11px; color: var(--light); }
   .empty { text-align: center; padding: 48px; color: var(--muted); font-size: 14px; }
+  .btn-checkin-row { padding: 5px 11px; border-radius: 6px; font-size: 12px; font-weight: 700; cursor: pointer; border: none; font-family: Arial, sans-serif; white-space: nowrap; }
+  .btn-checkin-row.do-checkin { background: var(--success-light); color: var(--success); border: 1px solid var(--success-border); }
+  .btn-checkin-row.do-checkin:hover { background: #C8ECD4; }
+  .btn-checkin-row.undo-checkin { background: var(--surface2); color: var(--light); border: 1px solid var(--border); }
+  .btn-checkin-row.undo-checkin:hover { background: var(--border); }
+  /* Modal */
+  .modal-overlay { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.5); z-index: 200; align-items: center; justify-content: center; }
+  .modal-overlay.show { display: flex; }
+  .modal { background: var(--surface); border-radius: var(--radius-lg); padding: 32px; max-width: 400px; width: 90%; box-shadow: 0 8px 40px rgba(0,0,0,0.2); }
+  .modal-name { font-size: 20px; font-weight: 700; margin-bottom: 4px; }
+  .modal-meta { font-size: 13px; color: var(--muted); margin-bottom: 20px; }
+  .modal-actions { display: flex; gap: 10px; margin-top: 24px; }
+  .modal-btn { flex: 1; padding: 12px; border-radius: var(--radius); font-size: 14px; font-weight: 700; cursor: pointer; border: none; font-family: Arial, sans-serif; }
+  .modal-btn.confirm { background: var(--success); color: #fff; }
+  .modal-btn.confirm:hover { background: #145020; }
+  .modal-btn.cancel-btn { background: var(--surface2); color: var(--muted); border: 1px solid var(--border); }
+  .modal-toast { font-size: 13px; padding: 10px 14px; border-radius: 8px; margin-top: 14px; display: none; }
+  .modal-toast.success { background: var(--success-light); color: var(--success); border: 1px solid var(--success-border); display: block; }
+  .modal-toast.error   { background: #FCEAEA; color: #7A1A1A; border: 1px solid #E8B4B4; display: block; }
 
   /* Studio manager */
   .studio-manager { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-lg); box-shadow: var(--shadow); margin-bottom: 28px; overflow: hidden; }
@@ -236,11 +255,13 @@
           <th>Check-In</th>
           <th>Check-In Time</th>
           <th>Registered</th>
+          <th>Action</th>
         </tr>
       </thead>
       <tbody>
         {% for r in regs %}
         <tr
+          id="row-{{ r.id }}"
           data-name="{{ r.full_name | lower }}"
           data-studio="{{ r.studio_name | lower }}"
           data-email="{{ r.email | lower }}"
@@ -277,6 +298,13 @@
             {% if r.checkin_time %}{{ r.checkin_time.strftime('%I:%M %p') }}{% else %}—{% endif %}
           </td>
           <td class="mono">{{ r.created_at.strftime('%m/%d/%Y') }}</td>
+          <td>
+            {% if r.checked_in %}
+            <button class="btn-checkin-row undo-checkin" onclick="openUndoModal('{{ r.id }}','{{ r.full_name }}','{{ r.studio_name }}')">↩ Undo</button>
+            {% else %}
+            <button class="btn-checkin-row do-checkin" onclick="openCheckinModal('{{ r.id }}','{{ r.full_name }}','{{ r.studio_name }}','{{ r.reg_label }}')">✓ Check In</button>
+            {% endif %}
+          </td>
         </tr>
         {% endfor %}
       </tbody>
@@ -286,6 +314,22 @@
     {% endif %}
   </div>
 
+</div>
+
+<!-- CHECK-IN MODAL -->
+<div class="modal-overlay" id="ci-modal" onclick="if(event.target===this)closeModal()">
+  <div class="modal">
+    <div class="modal-name" id="ci-modal-name"></div>
+    <div class="modal-meta" id="ci-modal-meta"></div>
+    <div id="ci-modal-body">
+      <p style="font-size:14px;color:var(--muted);line-height:1.6;" id="ci-modal-msg"></p>
+      <div class="modal-toast" id="ci-toast"></div>
+      <div class="modal-actions" id="ci-modal-actions">
+        <button class="modal-btn confirm" id="ci-confirm-btn"></button>
+        <button class="modal-btn cancel-btn" onclick="closeModal()">Cancel</button>
+      </div>
+    </div>
+  </div>
 </div>
 
 <script>
@@ -338,6 +382,105 @@
 
   refreshStats();
   setInterval(refreshStats, 30000);
+
+  // ── Admin check-in modal ──
+  let _ciId = null;
+
+  function openCheckinModal(id, name, studio, regLabel) {
+    _ciId = id;
+    document.getElementById('ci-modal-name').textContent = name;
+    document.getElementById('ci-modal-meta').textContent = studio + ' · ' + regLabel;
+    document.getElementById('ci-modal-msg').textContent  = 'Mark this student as checked in?';
+    document.getElementById('ci-toast').className        = 'modal-toast';
+    document.getElementById('ci-modal-actions').style.display = '';
+    const btn = document.getElementById('ci-confirm-btn');
+    btn.textContent = '✓ Check In';
+    btn.onclick = doCheckin;
+    document.getElementById('ci-modal').classList.add('show');
+  }
+
+  function openUndoModal(id, name, studio) {
+    _ciId = id;
+    document.getElementById('ci-modal-name').textContent = name;
+    document.getElementById('ci-modal-meta').textContent = studio;
+    document.getElementById('ci-modal-msg').textContent  = 'Undo check-in for this student?';
+    document.getElementById('ci-toast').className        = 'modal-toast';
+    document.getElementById('ci-modal-actions').style.display = '';
+    const btn = document.getElementById('ci-confirm-btn');
+    btn.textContent = '↩ Undo Check-In';
+    btn.onclick = doUndo;
+    document.getElementById('ci-modal').classList.add('show');
+  }
+
+  function closeModal() {
+    document.getElementById('ci-modal').classList.remove('show');
+    _ciId = null;
+  }
+
+  async function doCheckin() {
+    document.getElementById('ci-modal-actions').style.display = 'none';
+    const res  = await fetch('/admin/checkin', {
+      method: 'POST', headers: {'Content-Type':'application/json'},
+      body: JSON.stringify({id: _ciId})
+    });
+    const data = await res.json();
+    const toast = document.getElementById('ci-toast');
+    if (data.already) {
+      toast.textContent = `Already checked in at ${data.checkin_time}.`;
+      toast.className = 'modal-toast success';
+    } else if (data.success) {
+      toast.textContent = `Checked in at ${data.checkin_time}. ✓`;
+      toast.className = 'modal-toast success';
+      updateRow(_ciId, true, data.checkin_time);
+    } else {
+      toast.textContent = data.error || 'Something went wrong.';
+      toast.className = 'modal-toast error';
+      document.getElementById('ci-modal-actions').style.display = '';
+      return;
+    }
+    setTimeout(closeModal, 1400);
+  }
+
+  async function doUndo() {
+    document.getElementById('ci-modal-actions').style.display = 'none';
+    const res  = await fetch('/admin/undo-checkin', {
+      method: 'POST', headers: {'Content-Type':'application/json'},
+      body: JSON.stringify({id: _ciId})
+    });
+    const data = await res.json();
+    const toast = document.getElementById('ci-toast');
+    if (data.success) {
+      toast.textContent = 'Check-in undone.';
+      toast.className = 'modal-toast success';
+      updateRow(_ciId, false, null);
+    } else {
+      toast.textContent = data.error || 'Something went wrong.';
+      toast.className = 'modal-toast error';
+      document.getElementById('ci-modal-actions').style.display = '';
+      return;
+    }
+    setTimeout(closeModal, 1200);
+  }
+
+  function updateRow(id, checkedIn, time) {
+    const row = document.getElementById('row-' + id);
+    if (!row) return;
+    row.dataset.checkin = checkedIn ? 'in' : 'out';
+    // Update check-in badge cell (7th td, index 6)
+    const tds = row.querySelectorAll('td');
+    tds[6].innerHTML = checkedIn
+      ? '<span class="badge in">✓ In</span>'
+      : '<span class="badge out">Pending</span>';
+    // Update check-in time cell (index 7)
+    tds[7].textContent = time || '—';
+    // Update action button cell (index 9)
+    const nameText = tds[0].querySelector('div').textContent;
+    const studioText = tds[1].textContent;
+    const regText = tds[2].querySelector('.badge').textContent;
+    tds[9].innerHTML = checkedIn
+      ? `<button class="btn-checkin-row undo-checkin" onclick="openUndoModal('${id}','${nameText}','${studioText}')">↩ Undo</button>`
+      : `<button class="btn-checkin-row do-checkin" onclick="openCheckinModal('${id}','${nameText}','${studioText}','${regText}')">✓ Check In</button>`;
+  }
 
   // ── Studio manager ──
   let studiosLoaded = false;
