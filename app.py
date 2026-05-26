@@ -184,6 +184,61 @@ def send_confirmation_email(reg: Registration):
     except Exception as e:
         print(f'Email error: {e}')
 
+# ── ADMIN NOTIFICATION EMAIL ──
+NOTIFY_EMAIL = os.environ.get('NOTIFY_EMAIL', 'osa@onstageamerica.com')
+
+def send_admin_notification(reg: Registration):
+    sg_key = os.environ.get('SENDGRID_API_KEY')
+    if not sg_key:
+        return
+
+    base_url         = os.environ.get('BASE_URL', 'http://localhost:5000')
+    confirmation_url = f'{base_url}/confirm/{reg.id}'
+    amount_str       = f'${reg.amount / 100:.2f}' if reg.amount else 'No charge'
+
+    html = f'''
+<div style="font-family:Arial,sans-serif;max-width:520px;padding:24px;background:#f5f2ec;">
+  <div style="background:#111;border-radius:12px 12px 0 0;padding:20px 24px;">
+    <p style="margin:0;font-size:10px;font-weight:700;letter-spacing:0.14em;text-transform:uppercase;color:#C9A84C;">On Stage America</p>
+    <p style="margin:6px 0 0;font-size:20px;color:#fff;font-weight:700;">New Registration</p>
+  </div>
+  <div style="height:3px;background:linear-gradient(90deg,#C9A84C,#e8c96a,#C9A84C);"></div>
+  <div style="background:#fff;border-radius:0 0 12px 12px;padding:24px;">
+    <table style="width:100%;border-collapse:collapse;font-size:14px;">
+      <tr><td style="padding:8px 0;border-bottom:1px solid #f0ede6;color:#8a8780;width:130px;font-size:11px;text-transform:uppercase;font-weight:700;letter-spacing:0.04em;">Student</td>
+          <td style="padding:8px 0;border-bottom:1px solid #f0ede6;font-weight:600;">{reg.full_name}</td></tr>
+      <tr><td style="padding:8px 0;border-bottom:1px solid #f0ede6;color:#8a8780;font-size:11px;text-transform:uppercase;font-weight:700;letter-spacing:0.04em;">Studio</td>
+          <td style="padding:8px 0;border-bottom:1px solid #f0ede6;">{reg.studio_name or '—'}</td></tr>
+      <tr><td style="padding:8px 0;border-bottom:1px solid #f0ede6;color:#8a8780;font-size:11px;text-transform:uppercase;font-weight:700;letter-spacing:0.04em;">Email</td>
+          <td style="padding:8px 0;border-bottom:1px solid #f0ede6;">{reg.email or '—'}</td></tr>
+      <tr><td style="padding:8px 0;border-bottom:1px solid #f0ede6;color:#8a8780;font-size:11px;text-transform:uppercase;font-weight:700;letter-spacing:0.04em;">Registration</td>
+          <td style="padding:8px 0;border-bottom:1px solid #f0ede6;">{reg.reg_label}</td></tr>
+      <tr><td style="padding:8px 0;border-bottom:1px solid #f0ede6;color:#8a8780;font-size:11px;text-transform:uppercase;font-weight:700;letter-spacing:0.04em;">T-Shirt</td>
+          <td style="padding:8px 0;border-bottom:1px solid #f0ede6;">{reg.tshirt_size or '—'}</td></tr>
+      <tr><td style="padding:8px 0;border-bottom:1px solid #f0ede6;color:#8a8780;font-size:11px;text-transform:uppercase;font-weight:700;letter-spacing:0.04em;">Amount</td>
+          <td style="padding:8px 0;border-bottom:1px solid #f0ede6;font-weight:700;color:{'#1a5a2a' if reg.is_title else '#1a1814'};">{amount_str}{' — Title (Free)' if reg.is_title else ''}</td></tr>
+      <tr><td style="padding:8px 0;color:#8a8780;font-size:11px;text-transform:uppercase;font-weight:700;letter-spacing:0.04em;">Payment</td>
+          <td style="padding:8px 0;">{reg.payment_status.title()}</td></tr>
+    </table>
+    <div style="margin-top:20px;text-align:center;">
+      <a href="{confirmation_url}" style="display:inline-block;background:#111;color:#fff;padding:11px 22px;border-radius:8px;text-decoration:none;font-size:13px;font-weight:700;">View Confirmation →</a>
+    </div>
+  </div>
+</div>'''
+
+    message = Mail(
+        from_email=('osa@onstageamerica.com', 'On Stage America'),
+        to_emails=NOTIFY_EMAIL,
+        subject=f'New Registration: {reg.full_name} ({reg.studio_name or "No Studio"})',
+        html_content=html,
+    )
+    try:
+        sg = SendGridAPIClient(sg_key)
+        sg.send(message)
+        print(f'Admin notification sent to {NOTIFY_EMAIL}')
+    except Exception as e:
+        print(f'Admin notification error: {e}')
+
 # ── SQUARE HELPER ──
 def get_square_client():
     env = os.environ.get('SQUARE_ENV', 'sandbox')
@@ -262,11 +317,15 @@ def submit_registration():
 
     db.session.commit()
 
-    # Send confirmation email
+    # Send confirmation email to registrant and notification to admin
     try:
         send_confirmation_email(reg)
     except Exception as e:
-        print(f'Email failed: {e}')
+        print(f'Confirmation email failed: {e}')
+    try:
+        send_admin_notification(reg)
+    except Exception as e:
+        print(f'Admin notification failed: {e}')
 
     return jsonify({'success': True, 'id': reg.id})
 
