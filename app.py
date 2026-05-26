@@ -542,6 +542,17 @@ def admin_undo_checkin():
     return jsonify({'success': True})
 
 
+@app.route('/admin/delete-selected', methods=['POST'])
+def admin_delete_selected():
+    if not session.get('admin'):
+        abort(403)
+    ids = request.get_json().get('ids', [])
+    if not ids:
+        return jsonify({'error': 'No IDs provided'}), 400
+    deleted = Registration.query.filter(Registration.id.in_(ids)).delete(synchronize_session=False)
+    db.session.commit()
+    return jsonify({'deleted': deleted})
+
 @app.route('/admin/logout')
 def admin_logout():
     session.pop('admin', None)

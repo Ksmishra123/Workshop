@@ -73,6 +73,18 @@
   .badge.out { background: var(--surface2); color: var(--light); border: 1px solid var(--border); }
   .mono { font-family: 'Courier New', monospace; font-size: 11px; color: var(--light); }
   .empty { text-align: center; padding: 48px; color: var(--muted); font-size: 14px; }
+  /* Row selection */
+  .cb-cell { width: 36px; text-align: center; }
+  .row-cb { width: 16px; height: 16px; cursor: pointer; accent-color: #B42828; }
+  .select-bar { display: none; align-items: center; gap: 14px; background: #FFF3F3; border: 1px solid #F0C0C0; border-radius: var(--radius); padding: 10px 16px; margin-bottom: 12px; }
+  .select-bar.show { display: flex; }
+  .select-bar-count { font-size: 13px; font-weight: 700; color: #B42828; flex: 1; }
+  .select-bar-btn { padding: 7px 16px; border-radius: 6px; font-size: 13px; font-weight: 700; cursor: pointer; border: none; font-family: Arial, sans-serif; }
+  .select-bar-btn.delete { background: #B42828; color: #fff; }
+  .select-bar-btn.delete:hover { background: #8a1e1e; }
+  .select-bar-btn.clear { background: var(--surface2); color: var(--muted); border: 1px solid var(--border); }
+  tbody tr.selected-row { background: #FFF8F8 !important; }
+
   .btn-checkin-row { padding: 5px 11px; border-radius: 6px; font-size: 12px; font-weight: 700; cursor: pointer; border: none; font-family: Arial, sans-serif; white-space: nowrap; }
   .btn-checkin-row.do-checkin { background: var(--success-light); color: var(--success); border: 1px solid var(--success-border); }
   .btn-checkin-row.do-checkin:hover { background: #C8ECD4; }
@@ -245,12 +257,20 @@
     </select>
   </div>
 
+  <!-- SELECTION BAR -->
+  <div class="select-bar" id="select-bar">
+    <div class="select-bar-count" id="select-count"></div>
+    <button class="select-bar-btn clear" onclick="clearSelection()">Deselect All</button>
+    <button class="select-bar-btn delete" onclick="openDeleteModal()">🗑 Delete Selected</button>
+  </div>
+
   <!-- TABLE -->
   <div class="table-wrap">
     {% if regs %}
     <table id="reg-table">
       <thead>
         <tr>
+          <th class="cb-cell"><input type="checkbox" class="row-cb" id="select-all" onchange="toggleAll(this)"></th>
           <th>Student</th>
           <th>Studio</th>
           <th>Registration</th>
@@ -272,6 +292,7 @@
           data-email="{{ r.email | lower }}"
           data-reg="{{ r.reg_type or 'title' if r.is_title else r.reg_type }}"
           data-checkin="{{ 'in' if r.checked_in else 'out' }}">
+          <td class="cb-cell"><input type="checkbox" class="row-cb" value="{{ r.id }}" onchange="onRowCheck(this)"></td>
           <td>
             <div style="font-weight:600;">{{ r.full_name }}</div>
             <div style="font-size:11px;color:var(--light);">{{ r.email }}</div>
@@ -332,6 +353,19 @@
     <div class="modal-actions" id="wipe-actions">
       <button class="modal-btn danger" id="wipe-btn" onclick="doWipe()" disabled>Delete Everything</button>
       <button class="modal-btn cancel-btn" onclick="closeWipeModal()">Cancel</button>
+    </div>
+  </div>
+</div>
+
+<!-- DELETE SELECTED MODAL -->
+<div class="modal-overlay" id="del-modal" onclick="if(event.target===this)closeDeleteModal()">
+  <div class="modal">
+    <div class="modal-name" style="color:#B42828;">🗑 Delete Selected</div>
+    <div class="modal-meta" id="del-modal-meta"></div>
+    <div class="modal-toast" id="del-toast"></div>
+    <div class="modal-actions" id="del-actions">
+      <button class="modal-btn danger" onclick="doDelete()">Delete</button>
+      <button class="modal-btn cancel-btn" onclick="closeDeleteModal()">Cancel</button>
     </div>
   </div>
 </div>
@@ -480,6 +514,90 @@
       return;
     }
     setTimeout(closeModal, 1200);
+  }
+
+  // ── Row selection & delete ──
+  function visibleCheckboxes() {
+    return [...document.querySelectorAll('#reg-table tbody tr')]
+      .filter(r => r.style.display !== 'none')
+      .map(r => r.querySelector('.row-cb'));
+  }
+
+  function selectedIds() {
+    return [...document.querySelectorAll('#reg-table tbody .row-cb:checked')].map(cb => cb.value);
+  }
+
+  function updateSelectBar() {
+    const ids  = selectedIds();
+    const bar  = document.getElementById('select-bar');
+    const cnt  = document.getElementById('select-count');
+    bar.classList.toggle('show', ids.length > 0);
+    cnt.textContent = `${ids.length} record${ids.length !== 1 ? 's' : ''} selected`;
+    // Sync select-all state
+    const visible = visibleCheckboxes();
+    const allChecked = visible.length > 0 && visible.every(cb => cb.checked);
+    document.getElementById('select-all').checked = allChecked;
+    document.getElementById('select-all').indeterminate = !allChecked && ids.length > 0;
+  }
+
+  function onRowCheck(cb) {
+    cb.closest('tr').classList.toggle('selected-row', cb.checked);
+    updateSelectBar();
+  }
+
+  function toggleAll(master) {
+    visibleCheckboxes().forEach(cb => {
+      cb.checked = master.checked;
+      cb.closest('tr').classList.toggle('selected-row', master.checked);
+    });
+    updateSelectBar();
+  }
+
+  function clearSelection() {
+    document.querySelectorAll('#reg-table tbody .row-cb').forEach(cb => {
+      cb.checked = false;
+      cb.closest('tr').classList.remove('selected-row');
+    });
+    document.getElementById('select-all').checked = false;
+    document.getElementById('select-all').indeterminate = false;
+    updateSelectBar();
+  }
+
+  function openDeleteModal() {
+    const ids = selectedIds();
+    if (!ids.length) return;
+    document.getElementById('del-modal-meta').textContent =
+      `Permanently delete ${ids.length} registration${ids.length !== 1 ? 's' : ''}? This cannot be undone.`;
+    document.getElementById('del-toast').className = 'modal-toast';
+    document.getElementById('del-actions').style.display = '';
+    document.getElementById('del-modal').classList.add('show');
+  }
+
+  function closeDeleteModal() {
+    document.getElementById('del-modal').classList.remove('show');
+  }
+
+  async function doDelete() {
+    const ids = selectedIds();
+    document.getElementById('del-actions').style.display = 'none';
+    const res  = await fetch('/admin/delete-selected', {
+      method: 'POST', headers: {'Content-Type':'application/json'},
+      body: JSON.stringify({ids})
+    });
+    const data = await res.json();
+    const toast = document.getElementById('del-toast');
+    if (data.deleted !== undefined) {
+      toast.textContent = `Deleted ${data.deleted} record${data.deleted !== 1 ? 's' : ''}.`;
+      toast.className = 'modal-toast success';
+      ids.forEach(id => document.getElementById('row-' + id)?.remove());
+      clearSelection();
+      setTimeout(closeDeleteModal, 1200);
+      refreshStats();
+    } else {
+      toast.textContent = data.error || 'Something went wrong.';
+      toast.className = 'modal-toast error';
+      document.getElementById('del-actions').style.display = '';
+    }
   }
 
   // ── Wipe modal ──
