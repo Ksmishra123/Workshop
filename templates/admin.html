@@ -92,6 +92,11 @@
   .modal-toast { font-size: 13px; padding: 10px 14px; border-radius: 8px; margin-top: 14px; display: none; }
   .modal-toast.success { background: var(--success-light); color: var(--success); border: 1px solid var(--success-border); display: block; }
   .modal-toast.error   { background: #FCEAEA; color: #7A1A1A; border: 1px solid #E8B4B4; display: block; }
+  .modal-btn.danger    { background: #B42828; color: #fff; }
+  .modal-btn.danger:hover { background: #8a1e1e; }
+  .modal-btn.danger:disabled { background: #ccc; cursor: not-allowed; }
+  .wipe-input { width: 100%; padding: 11px 14px; border: 1.5px solid #E8B4B4; border-radius: 8px; font-size: 15px; font-family: 'Courier New', monospace; letter-spacing: 0.08em; outline: none; margin-top: 10px; }
+  .wipe-input:focus { border-color: #B42828; }
 
   /* Studio manager */
   .studio-manager { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-lg); box-shadow: var(--shadow); margin-bottom: 28px; overflow: hidden; }
@@ -148,6 +153,7 @@
     <a href="/register" class="topbar-btn">Registration Form</a>
     <a href="/admin/upload" class="topbar-btn">⬆ Bulk Upload</a>
     <a href="/admin/export" class="topbar-btn primary">⬇ Export CSV</a>
+    <button class="topbar-btn" onclick="openWipeModal()" style="background:rgba(180,40,40,0.25);border-color:rgba(220,80,80,0.4);color:rgba(255,180,180,0.9);">🗑 Clear All Data</button>
     <a href="/admin/logout" class="topbar-btn">Sign Out</a>
   </div>
 </div>
@@ -316,6 +322,21 @@
 
 </div>
 
+<!-- WIPE MODAL -->
+<div class="modal-overlay" id="wipe-modal" onclick="if(event.target===this)closeWipeModal()">
+  <div class="modal">
+    <div class="modal-name" style="color:#B42828;">⚠️ Delete All Registrations</div>
+    <div class="modal-meta" style="color:var(--muted);margin-bottom:16px;">This will permanently delete every registration record. This cannot be undone.</div>
+    <p style="font-size:13px;color:var(--muted);">Type <strong style="font-family:'Courier New',monospace;color:#B42828;">CONFIRM</strong> below to proceed:</p>
+    <input class="wipe-input" id="wipe-phrase" placeholder="CONFIRM" oninput="checkWipePhrase()">
+    <div class="modal-toast" id="wipe-toast"></div>
+    <div class="modal-actions" id="wipe-actions">
+      <button class="modal-btn danger" id="wipe-btn" onclick="doWipe()" disabled>Delete Everything</button>
+      <button class="modal-btn cancel-btn" onclick="closeWipeModal()">Cancel</button>
+    </div>
+  </div>
+</div>
+
 <!-- CHECK-IN MODAL -->
 <div class="modal-overlay" id="ci-modal" onclick="if(event.target===this)closeModal()">
   <div class="modal">
@@ -460,6 +481,41 @@
       return;
     }
     setTimeout(closeModal, 1200);
+  }
+
+  // ── Wipe modal ──
+  function openWipeModal() {
+    document.getElementById('wipe-phrase').value = '';
+    document.getElementById('wipe-btn').disabled = true;
+    document.getElementById('wipe-toast').className = 'modal-toast';
+    document.getElementById('wipe-actions').style.display = '';
+    document.getElementById('wipe-modal').classList.add('show');
+    setTimeout(() => document.getElementById('wipe-phrase').focus(), 100);
+  }
+  function closeWipeModal() {
+    document.getElementById('wipe-modal').classList.remove('show');
+  }
+  function checkWipePhrase() {
+    const val = document.getElementById('wipe-phrase').value.trim().toUpperCase();
+    document.getElementById('wipe-btn').disabled = val !== 'CONFIRM';
+  }
+  async function doWipe() {
+    document.getElementById('wipe-actions').style.display = 'none';
+    const res  = await fetch('/admin/clear-all', {
+      method: 'POST', headers: {'Content-Type':'application/json'},
+      body: JSON.stringify({confirm: 'CONFIRM'})
+    });
+    const data = await res.json();
+    const toast = document.getElementById('wipe-toast');
+    if (data.deleted !== undefined) {
+      toast.textContent = `Deleted ${data.deleted} registration${data.deleted !== 1 ? 's' : ''}. Reloading…`;
+      toast.className = 'modal-toast success';
+      setTimeout(() => window.location.reload(), 1600);
+    } else {
+      toast.textContent = data.error || 'Something went wrong.';
+      toast.className = 'modal-toast error';
+      document.getElementById('wipe-actions').style.display = '';
+    }
   }
 
   function updateRow(id, checkedIn, time) {
