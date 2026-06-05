@@ -462,12 +462,16 @@ def admin():
     checked  = sum(1 for r in regs if r.checked_in)
     title    = sum(1 for r in regs if r.is_title)
     revenue  = sum(r.amount for r in regs if r.payment_status == 'paid')
+    expected = sum(r.amount for r in regs if not r.is_title)  # total owed
+    outstanding = expected - revenue
     return render_template('admin.html',
                            regs=regs,
                            total=total,
                            checked=checked,
                            title=title,
-                           revenue=revenue)
+                           revenue=revenue,
+                           expected=expected,
+                           outstanding=outstanding)
 
 TSHIRT_SIZES = ['Youth Small','Youth Medium','Youth Large',
                 'Adult Small','Adult Medium','Adult Large','Adult XL','Adult 2XL']
@@ -481,6 +485,8 @@ def admin_stats():
     checked  = sum(1 for r in regs if r.checked_in)
     title    = sum(1 for r in regs if r.is_title)
     revenue  = sum(r.amount for r in regs if r.payment_status == 'paid')
+    expected = sum(r.amount for r in regs if not r.is_title)  # total owed
+    outstanding = expected - revenue
     workshop = sum(1 for r in regs if r.reg_type == 'workshop')
     opening  = sum(1 for r in regs if r.reg_type == 'opening')
     both     = sum(1 for r in regs if r.reg_type == 'both')
@@ -491,6 +497,8 @@ def admin_stats():
         'pending':  total - checked,
         'title':    title,
         'revenue':  revenue,
+        'expected': expected,
+        'outstanding': outstanding,
         'workshop': workshop,
         'opening':  opening,
         'both':     both,
@@ -676,6 +684,40 @@ def admin_delete_selected():
     deleted = Registration.query.filter(Registration.id.in_(ids)).delete(synchronize_session=False)
     db.session.commit()
     return jsonify({'deleted': deleted})
+
+@app.route('/admin/mark-paid', methods=['POST'])
+def admin_mark_paid():
+    """Mark the given registrations as paid. Used for bulk-uploaded (invoiced)
+    studio registrations once the studio settles up. Accepts one or many IDs.
+    Title/free registrations are left alone (they owe nothing). Setting
+    `status` to 'invoiced' reverses it (e.g. if marked paid by mistake)."""
+    if not session.get('admin'):
+        abort(403)
+    payload = request.get_json()
+    ids     = payload.get('ids', [])
+    status  = payload.get('status', 'paid')
+    if status not in ('paid', 'invoiced', 'pending'):
+        status = 'paid'
+    if not ids:
+        return jsonify({'error': 'No records selected'}), 400
+
+    regs = Registration.query.filter(Registration.id.in_(ids)).all()
+    updated = 0
+    for reg in regs:
+        if reg.is_title:  # title registrants are free — nothing to pay
+            continue
+        reg.payment_status = status
+        updated += 1
+    db.session.commit()
+
+    # Recompute revenue totals so the dashboard can update its stat cards.
+    all_regs    = Registration.query.all()
+    revenue     = sum(r.amount for r in all_regs if r.payment_status == 'paid')
+    expected    = sum(r.amount for r in all_regs if not r.is_title)
+    outstanding = expected - revenue
+    return jsonify({'updated': updated, 'status': status,
+                    'revenue': revenue, 'expected': expected,
+                    'outstanding': outstanding})
 
 @app.route('/admin/logout')
 def admin_logout():
