@@ -129,19 +129,30 @@ def generate_qr_bytes(data: str) -> bytes:
     return buf.getvalue()
 
 # ── EMAIL HELPER ──
-def send_confirmation_email(reg: Registration):
+def send_confirmation_email(reg: Registration, cc=None, to_override=None):
+    """Send the QR confirmation email to the student (or studio if the student
+    has no email). Returns (ok: bool, reason: str). `cc` is an optional email
+    address to carbon-copy (e.g. the admin, to confirm delivery). `to_override`
+    forces the email TO a specific address instead of the student/studio — used
+    by the admin 'send to me (test)' flow to verify delivery without emailing
+    the real studios; it also tags the subject with [TEST]."""
     sg_key = os.environ.get('SENDGRID_API_KEY')
     if not sg_key:
         print('No SendGrid key — skipping email')
-        return
+        return False, 'no SendGrid key'
 
-    # If no student email, fall back to studio contact email
-    to_email   = (reg.email or '').strip() or (reg.studio_email or '').strip()
-    to_studio  = not bool((reg.email or '').strip())  # True = sending to studio, not student
+    is_test = bool(to_override and to_override.strip())
+    if is_test:
+        to_email  = to_override.strip()
+        to_studio = False  # render the student-facing version for a clean preview
+    else:
+        # If no student email, fall back to studio contact email
+        to_email  = (reg.email or '').strip() or (reg.studio_email or '').strip()
+        to_studio = not bool((reg.email or '').strip())  # True = sending to studio, not student
 
     if not to_email:
         print(f'No email for {reg.full_name} — skipping confirmation email')
-        return
+        return False, 'no email address'
 
     base_url  = os.environ.get('BASE_URL', 'http://localhost:5000')
     qr_data   = f'{base_url}/confirm/{reg.id}'
@@ -159,6 +170,8 @@ def send_confirmation_email(reg: Registration):
     subject = (f'{reg.full_name} is Registered! — On Stage America Workshop'
                if to_studio else
                'You\'re Registered! — On Stage America Workshop')
+    if is_test:
+        subject = f'[TEST] {reg.full_name} — {subject}'
 
     message = Mail(
         from_email=('osa@onstageamerica.com', 'On Stage America'),
@@ -166,6 +179,12 @@ def send_confirmation_email(reg: Registration):
         subject=subject,
         html_content=html
     )
+
+    # Carbon-copy the admin so they can confirm the email went out. Don't CC
+    # the same address we're already sending to (SendGrid rejects duplicates).
+    # In test mode the message already goes straight to the admin, so skip CC.
+    if cc and not is_test and cc.strip().lower() != to_email.strip().lower():
+        message.add_cc(cc.strip())
 
     # Attach QR as inline image
     attachment = Attachment(
@@ -180,9 +199,11 @@ def send_confirmation_email(reg: Registration):
     try:
         sg = SendGridAPIClient(sg_key)
         sg.send(message)
-        print(f'Email sent to {reg.email}')
+        print(f'QR email sent to {to_email}' + (f' (cc {cc})' if cc else ''))
+        return True, to_email
     except Exception as e:
         print(f'Email error: {e}')
+        return False, str(e)
 
 # ── ADMIN NOTIFICATION EMAIL ──
 NOTIFY_EMAIL = os.environ.get('NOTIFY_EMAIL', 'osa@onstageamerica.com')
@@ -609,6 +630,42 @@ def admin_send_email():
 
     return jsonify({'sent': sent, 'skipped': skipped})
 
+@app.route('/admin/send-qr-selected', methods=['POST'])
+def admin_send_qr_selected():
+    """Send each selected registration its QR confirmation email — to the
+    student's email, or the studio email as a fallback. The admin is CC'd on
+    every message so they can confirm delivery."""
+    if not session.get('admin'):
+        abort(403)
+    if not os.environ.get('SENDGRID_API_KEY'):
+        return jsonify({'error': 'SendGrid API key not configured'}), 500
+
+    payload = request.get_json()
+    ids  = payload.get('ids', [])
+    test = bool(payload.get('test'))
+    if not ids:
+        return jsonify({'error': 'No records selected'}), 400
+
+    admin_email = os.environ.get('NOTIFY_EMAIL', 'osa@onstageamerica.com')
+    regs = Registration.query.filter(Registration.id.in_(ids)).all()
+
+    sent = 0
+    skipped = []
+    for reg in regs:
+        if test:
+            # Test mode: send every QR TO the admin instead of the real
+            # student/studio, so delivery can be verified without spamming them.
+            ok, reason = send_confirmation_email(reg, to_override=admin_email)
+        else:
+            ok, reason = send_confirmation_email(reg, cc=admin_email)
+        if ok:
+            sent += 1
+        else:
+            skipped.append(f'{reg.full_name}: {reason}')
+
+    return jsonify({'sent': sent, 'skipped': skipped, 'cc': admin_email,
+                    'test': test, 'test_to': admin_email if test else None})
+
 @app.route('/admin/delete-selected', methods=['POST'])
 def admin_delete_selected():
     if not session.get('admin'):
@@ -727,19 +784,43 @@ def admin_upload_process():
         return jsonify({'error': 'Please upload a .csv file'}), 400
 
     content = file.read().decode('utf-8-sig')  # strip BOM if Excel-generated
-    reader  = csv.DictReader(_io.StringIO(content))
 
     # Normalise header names (strip spaces, lowercase)
     def norm(k):
-        return k.strip().lower().replace(' ', '_')
+        return (k or '').strip().lower().replace(' ', '_')
+
+    # Find the real header row. Excel "Save As CSV" often prepends a title
+    # row (e.g. the sheet name) or other junk above the actual columns, which
+    # would otherwise make DictReader treat those as the field names and skip
+    # every student. Scan the first several lines for the row that contains the
+    # required columns and start parsing from there.
+    all_lines  = content.splitlines()
+    header_idx = 0
+    for i, line in enumerate(all_lines[:10]):
+        cells = {norm(c) for c in line.split(',')}
+        if 'first_name' in cells and 'last_name' in cells:
+            header_idx = i
+            break
+    body = '\n'.join(all_lines[header_idx:])
+    reader = csv.DictReader(_io.StringIO(body))
 
     results = []
     errors  = []
-    row_num = 1
+    row_num = header_idx + 1  # 1-based row number of the header line
+
+    # All rows in one file are from the same studio, which is often typed only
+    # on the first student row. Carry the last non-blank studio name/email
+    # forward so blank rows inherit it.
+    last_studio_name  = ''
+    last_studio_email = ''
 
     for raw_row in reader:
         row_num += 1
         row = {norm(k): (v or '').strip() for k, v in raw_row.items()}
+
+        # Silently skip fully-blank rows (trailing empty rows from Excel).
+        if not any(row.values()):
+            continue
 
         # Skip the sample/notes row if it looks like instructions
         if row.get('studio_name', '').lower() in ('your studio name', 'studio name'):
@@ -751,6 +832,29 @@ def admin_upload_process():
             errors.append(f'Row {row_num}: missing first or last name — skipped')
             continue
 
+        # Carry-forward studio name/email from whichever row last supplied a
+        # *valid* one. CSVs often have placeholder junk in these columns
+        # ('Studio', 'OR', a '#') on stray rows — only accept a studio_email
+        # that looks like an email, and ignore obvious placeholder names, so
+        # the carried value stays the real studio rather than the junk.
+        PLACEHOLDER_STUDIO = {'studio', 'studio name', 'your studio name', 'n/a', 'na', '-'}
+
+        studio_name  = ' '.join(row.get('studio_name', '').strip().split())
+        studio_email = row.get('studio_email', '').strip().lower()
+
+        def looks_like_email(e):
+            return '@' in e and '.' in e.rsplit('@', 1)[-1]
+
+        if studio_name and studio_name.lower() not in PLACEHOLDER_STUDIO:
+            last_studio_name = studio_name
+        else:
+            studio_name = last_studio_name
+
+        if studio_email and looks_like_email(studio_email):
+            last_studio_email = studio_email
+        else:
+            studio_email = last_studio_email
+
         is_title  = row.get('is_title', 'no').lower() in ('yes', 'y', '1', 'true')
         reg_type  = row.get('reg_type', 'workshop').lower().strip()
         if reg_type not in ('workshop', 'opening', 'both'):
@@ -759,7 +863,7 @@ def admin_upload_process():
         amount = 0 if is_title else PRICES.get(reg_type, 0)
 
         reg = Registration(
-            studio_name   = ' '.join(row.get('studio_name', '').strip().split()),
+            studio_name   = studio_name,
             first_name    = first,
             last_name     = last,
             gender        = row.get('gender', ''),
@@ -767,7 +871,7 @@ def admin_upload_process():
             email         = row.get('email', '').lower(),
             phone         = row.get('phone', ''),
             mobile        = row.get('mobile', ''),
-            studio_email  = row.get('studio_email', '').lower(),
+            studio_email  = studio_email,
             is_title      = is_title,
             routine_name  = row.get('routine_name', ''),
             reg_type      = reg_type,

@@ -273,6 +273,8 @@
   <div class="select-bar" id="select-bar">
     <div class="select-bar-count" id="select-count"></div>
     <button class="select-bar-btn clear" onclick="clearSelection()">Deselect All</button>
+    <button class="select-bar-btn" id="send-qr-btn" onclick="sendQrSelected(false)" style="background:var(--forest);color:#fff;border-color:var(--forest);">📲 Send QR Email</button>
+    <button class="select-bar-btn" id="send-qr-test-btn" onclick="sendQrSelected(true)" style="background:var(--gold);color:#1A1814;border-color:var(--gold);">🧪 Send QR to Me (test)</button>
     <button class="select-bar-btn delete" onclick="openDeleteModal()">🗑 Delete Selected</button>
   </div>
 
@@ -621,6 +623,44 @@
 
   function selectedIds() {
     return [...document.querySelectorAll('#reg-table tbody .row-cb:checked')].map(cb => cb.value);
+  }
+
+  async function sendQrSelected(test) {
+    const ids = selectedIds();
+    if (!ids.length) return;
+    const n = ids.length;
+    const prompt = test
+      ? `TEST MODE: send ${n} QR email${n !== 1 ? 's' : ''} to YOUR admin address only (the real students/studios will NOT be emailed)?`
+      : `Send the QR confirmation email to ${n} selected record${n !== 1 ? 's' : ''}?\n\nEach email goes to the student (or the studio if the student has no email), and you'll be CC'd on every one.`;
+    if (!confirm(prompt)) return;
+
+    const btn  = document.getElementById(test ? 'send-qr-test-btn' : 'send-qr-btn');
+    const orig = btn.textContent;
+    btn.disabled = true;
+    btn.textContent = 'Sending…';
+    try {
+      const res  = await fetch('/admin/send-qr-selected', {
+        method: 'POST', headers: {'Content-Type':'application/json'},
+        body: JSON.stringify({ids, test})
+      });
+      const data = await res.json();
+      if (data.error) {
+        alert('Error: ' + data.error);
+      } else {
+        let msg = data.test
+          ? `✓ Sent ${data.sent} TEST QR email${data.sent !== 1 ? 's' : ''} to ${data.test_to}. Check that inbox.`
+          : `✓ Sent ${data.sent} QR email${data.sent !== 1 ? 's' : ''} (CC'd to ${data.cc}).`;
+        if (data.skipped && data.skipped.length) {
+          msg += `\n\n${data.skipped.length} skipped:\n• ` + data.skipped.join('\n• ');
+        }
+        alert(msg);
+      }
+    } catch(e) {
+      alert('Send failed: ' + e.message);
+    } finally {
+      btn.disabled = false;
+      btn.textContent = orig;
+    }
   }
 
   function updateSelectBar() {
