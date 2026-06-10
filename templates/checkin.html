@@ -43,6 +43,13 @@
   .scan-top h1 { font-size: 22px; font-weight: 700; color: #fff; margin-bottom: 5px; }
   .scan-top p { font-size: 14px; color: rgba(255,255,255,0.5); }
   .scan-body { padding: 26px 30px; }
+  /* MODE TOGGLE */
+  .mode-toggle { display: flex; gap: 6px; background: var(--surface2); border: 1.5px solid var(--border); border-radius: var(--radius); padding: 4px; margin-bottom: 18px; }
+  .mode-btn { flex: 1; padding: 10px 6px; background: transparent; border: none; border-radius: 7px; font-size: 13px; font-weight: 700; color: var(--muted); cursor: pointer; font-family: Arial, sans-serif; display: flex; flex-direction: column; align-items: center; gap: 3px; transition: all 0.12s; }
+  .mode-btn .mode-emoji { font-size: 18px; }
+  .mode-btn:hover { color: var(--green); }
+  .mode-btn.active { background: var(--surface); color: var(--green); box-shadow: var(--shadow); }
+  .mode-hint { font-size: 12.5px; color: var(--muted); text-align: center; background: var(--green-light); border: 1px solid var(--success-border); border-radius: var(--radius); padding: 9px 12px; margin-bottom: 16px; line-height: 1.5; }
   .cam-toggle { width: 100%; padding: 13px; background: var(--surface2); border: 1.5px solid var(--border); color: var(--text); border-radius: var(--radius); font-size: 14px; font-weight: 600; cursor: pointer; margin-bottom: 18px; display: flex; align-items: center; justify-content: center; gap: 8px; font-family: Arial, sans-serif; transition: all 0.12s; }
   .cam-toggle:hover { border-color: var(--green-mid); color: var(--green); }
   .cam-toggle.active { background: var(--danger-light); border-color: #E8B4B4; color: var(--danger); }
@@ -154,10 +161,16 @@
     <div class="screen active" id="screen-scan">
       <div class="scan-card">
         <div class="scan-top">
-          <h1>Scan Student QR Code</h1>
-          <p>Or enter the Confirmation ID manually below</p>
+          <h1>Check In Student</h1>
+          <p>Choose how you're scanning today</p>
         </div>
         <div class="scan-body">
+          <div class="mode-toggle" id="mode-toggle">
+            <button class="mode-btn" id="mode-camera"  onclick="setMode('camera')"><span class="mode-emoji">📷</span>Camera</button>
+            <button class="mode-btn" id="mode-usb"     onclick="setMode('usb')"><span class="mode-emoji">⌨️</span>USB Scanner</button>
+            <button class="mode-btn" id="mode-manual"  onclick="setMode('manual')"><span class="mode-emoji">✍️</span>Manual</button>
+          </div>
+          <div class="mode-hint" id="mode-hint"></div>
           <button class="cam-toggle" id="cam-btn" onclick="toggleCam()">📷 Start Camera</button>
           <div class="video-wrap" id="video-wrap">
             <video id="qr-video" autoplay muted playsinline></video>
@@ -243,6 +256,60 @@
   let camStream  = null;
   let camRaf     = null;
   let autoTimer  = null;
+  let scanMode   = 'usb';   // 'camera' | 'usb' | 'manual' — per-device, see setMode()
+  let refocusTimer = null;
+
+  // ── SCAN MODE (camera / USB scanner / manual) ──
+  const MODE_HINTS = {
+    camera: '📷 Point the laptop camera at the student\'s QR code.',
+    usb:    '⌨️ Scan with the handheld USB scanner — the code lands in the box and checks in automatically. Keep this window focused.',
+    manual: '✍️ Type the Confirmation ID and press Enter or Look Up Student.',
+  };
+
+  function setMode(mode, save = true) {
+    if (!['camera','usb','manual'].includes(mode)) mode = 'usb';
+    scanMode = mode;
+    if (save) { try { localStorage.setItem('checkinMode', mode); } catch(e){} }
+
+    // Toggle button highlight
+    ['camera','usb','manual'].forEach(m =>
+      document.getElementById('mode-' + m).classList.toggle('active', m === mode));
+    document.getElementById('mode-hint').textContent = MODE_HINTS[mode];
+
+    // Camera button + video only relevant in camera mode
+    const camBtn = document.getElementById('cam-btn');
+    camBtn.style.display = (mode === 'camera') ? 'flex' : 'none';
+    if (mode !== 'camera') stopCam();
+
+    // USB scanner & manual both rely on the text input; USB also needs the
+    // field to stay focused so scanned keystrokes always land there.
+    stopRefocus();
+    if (mode === 'usb') startRefocus();
+    focusInput();
+  }
+
+  function focusInput() {
+    const el = document.getElementById('id-input');
+    // Only steal focus while the scan screen is visible.
+    if (el && document.getElementById('screen-scan').classList.contains('active')) {
+      setTimeout(() => el.focus(), 50);
+    }
+  }
+
+  // In USB mode, if focus drifts off the input (a stray click), pull it back so
+  // the next scan isn't lost. Runs only while the scan screen is active.
+  function startRefocus() {
+    stopRefocus();
+    refocusTimer = setInterval(() => {
+      if (scanMode !== 'usb') return;
+      const scan = document.getElementById('screen-scan');
+      const el   = document.getElementById('id-input');
+      if (scan.classList.contains('active') && document.activeElement !== el) el.focus();
+    }, 600);
+  }
+  function stopRefocus() {
+    if (refocusTimer) { clearInterval(refocusTimer); refocusTimer = null; }
+  }
 
   // Clock
   setInterval(() => {
@@ -448,10 +515,16 @@
     setError('');
     document.getElementById('spinner').classList.remove('show');
     showScreen('screen-scan');
-    setTimeout(() => document.getElementById('id-input').focus(), 100);
+    // Back on the scan screen: restore the chosen mode's focus/refocus behaviour.
+    if (scanMode === 'usb') startRefocus();
+    focusInput();
   }
 
-  window.addEventListener('load', () => setTimeout(() => document.getElementById('id-input').focus(), 300));
+  window.addEventListener('load', () => {
+    let saved = 'usb';
+    try { saved = localStorage.getItem('checkinMode') || 'usb'; } catch(e){}
+    setMode(saved, false);   // applies hint, focus, and refocus for the saved mode
+  });
 </script>
 </body>
 </html>
