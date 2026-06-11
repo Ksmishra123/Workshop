@@ -1,0 +1,201 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Check-In Report — OSA Admin</title>
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  :root {
+    --forest:#111111;--green:#1A1A1A;--green-mid:#B8952A;
+    --green-light:#F9F4E8;--gold:#C9A84C;
+    --text:#1A1814;--muted:#5A5750;--light:#8A8780;
+    --border:#DDD9D0;--bg:#F5F2EC;--surface:#fff;--surface2:#F4F1EB;
+    --success:#1A5A2A;--success-light:#E8F5EC;--success-border:#B8DCC4;
+    --radius:10px;--radius-lg:16px;--shadow:0 1px 4px rgba(0,0,0,0.07);
+  }
+  body { font-family: Arial, Helvetica, sans-serif; background: var(--bg); color: var(--text); min-height: 100vh; }
+  .topbar { background: var(--forest); padding: 0 24px; height: 52px; display: flex; align-items: center; gap: 14px; position: sticky; top: 0; z-index: 50; }
+  .topbar img { height: 32px; width: auto; filter: brightness(0) invert(1); }
+  .topbar-title { font-size: 14px; color: rgba(255,255,255,0.6); }
+  .topbar-right { margin-left: auto; display: flex; gap: 10px; }
+  .topbar-btn { background: rgba(255,255,255,0.1); border: 1px solid rgba(255,255,255,0.15); color: rgba(255,255,255,0.8); padding: 6px 14px; border-radius: 6px; font-size: 13px; cursor: pointer; text-decoration: none; font-family: Arial, sans-serif; }
+  .topbar-btn:hover { background: rgba(255,255,255,0.2); }
+  .topbar-btn.primary { background: var(--gold); border-color: var(--gold); color: #1A1814; font-weight: 700; }
+  .stripe { height: 3px; background: linear-gradient(90deg,var(--gold) 0%,var(--green-mid) 50%,var(--gold) 100%); }
+  .main { padding: 28px 32px 60px; max-width: 1100px; margin: 0 auto; }
+  h1 { font-size: 22px; font-weight: 700; margin-bottom: 4px; }
+  .sub { font-size: 14px; color: var(--muted); margin-bottom: 22px; }
+
+  .summary { display: flex; gap: 14px; flex-wrap: wrap; margin-bottom: 20px; }
+  .sum-card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 14px 20px; box-shadow: var(--shadow); min-width: 120px; }
+  .sum-label { font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.07em; color: var(--light); margin-bottom: 5px; }
+  .sum-val { font-size: 26px; font-weight: 700; font-family: 'Courier New', monospace; line-height: 1; }
+
+  .toolbar { display: flex; gap: 12px; margin-bottom: 16px; flex-wrap: wrap; align-items: center; }
+  .search-input { flex: 1; min-width: 200px; padding: 11px 16px; border: 1.5px solid var(--border); border-radius: var(--radius); font-size: 14px; outline: none; font-family: Arial, sans-serif; }
+  .search-input:focus { border-color: var(--green-mid); }
+
+  .table-wrap { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-lg); overflow: hidden; box-shadow: var(--shadow); }
+  table { width: 100%; border-collapse: collapse; font-size: 13px; }
+  thead th { background: var(--forest); color: rgba(255,255,255,0.85); padding: 11px 14px; text-align: left; font-size: 11px; text-transform: uppercase; letter-spacing: 0.06em; white-space: nowrap; cursor: pointer; user-select: none; }
+  thead th:hover { color: #fff; }
+  thead th .arrow { font-size: 9px; opacity: 0.5; margin-left: 3px; }
+  tbody td { padding: 11px 14px; border-bottom: 1px solid var(--border); vertical-align: top; }
+  tbody tr:last-child td { border-bottom: none; }
+  tbody tr:hover { background: var(--surface2); }
+  .col-time { font-family: 'Courier New', monospace; font-size: 12px; white-space: nowrap; }
+  .col-name { font-weight: 600; }
+  .col-studio { color: var(--muted); }
+  .badge { display: inline-block; padding: 2px 8px; border-radius: 100px; font-size: 11px; font-weight: 700; white-space: nowrap; }
+  .badge.title { background: #FBF5E6; color: #8A6200; border: 1px solid #E8D498; }
+  .badge.workshop { background: var(--green-light); color: var(--green-mid); border: 1px solid #E2D49A; }
+  .badge.opening { background: #EEF0F8; color: #4A5080; border: 1px solid #C8CCDC; }
+  .badge.both { background: #F0E8F8; color: #6A3080; border: 1px solid #D0B0E8; }
+  .items { display: flex; flex-direction: column; gap: 3px; }
+  .item-line { font-size: 12.5px; }
+  .item-line.special { color: #6A3080; font-weight: 700; }
+  .col-by { white-space: nowrap; }
+  .empty { padding: 50px; text-align: center; color: var(--light); }
+
+  @media print {
+    .topbar, .toolbar, .stripe { display: none; }
+    body { background: #fff; }
+    .main { padding: 0; max-width: none; }
+    .table-wrap { border: none; box-shadow: none; }
+    thead th { background: #000 !important; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+  }
+  @media (max-width: 700px) { .main { padding: 16px; } .col-studio, .col-by { display: none; } }
+</style>
+</head>
+<body>
+
+<div class="topbar">
+  <img src="/static/osa-logo.png" alt="On Stage America">
+  <span style="color:rgba(255,255,255,0.2);">/</span>
+  <div class="topbar-title">Check-In Report</div>
+  <div class="topbar-right">
+    <a href="/admin" class="topbar-btn">← Dashboard</a>
+    <a href="#" onclick="window.print();return false;" class="topbar-btn">🖨 Print</a>
+    <a href="/admin/checkin-report.csv" class="topbar-btn primary">⬇ Download CSV</a>
+  </div>
+</div>
+<div class="stripe"></div>
+
+<div class="main">
+  <h1>Check-In Report</h1>
+  <p class="sub">A record of every student checked in — when, by whom, and the items they were given.</p>
+
+  <div class="summary">
+    <div class="sum-card">
+      <div class="sum-label">Total Checked In</div>
+      <div class="sum-val" id="sum-total">{{ total }}</div>
+    </div>
+    <div class="sum-card">
+      <div class="sum-label">Wristbands Handed Out</div>
+      <div class="sum-val" id="sum-bands">—</div>
+    </div>
+    <div class="sum-card">
+      <div class="sum-label">T-Shirts Handed Out</div>
+      <div class="sum-val" id="sum-shirts">—</div>
+    </div>
+    <div class="sum-card">
+      <div class="sum-label">Title Packages</div>
+      <div class="sum-val" id="sum-titles">—</div>
+    </div>
+  </div>
+
+  <div class="toolbar">
+    <input type="text" class="search-input" id="search" placeholder="Search by name, studio, or staff…" oninput="filterRows()">
+  </div>
+
+  <div class="table-wrap">
+    {% if rows %}
+    <table id="report-table">
+      <thead>
+        <tr>
+          <th onclick="sortBy(0)">Check-In Time<span class="arrow">▲</span></th>
+          <th onclick="sortBy(1)">Student<span class="arrow"></span></th>
+          <th onclick="sortBy(2)">Studio<span class="arrow"></span></th>
+          <th onclick="sortBy(3)">Registration<span class="arrow"></span></th>
+          <th>Items Given</th>
+          <th onclick="sortBy(5)">Checked In By<span class="arrow"></span></th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for row in rows %}
+        <tr data-search="{{ (row.name ~ ' ' ~ row.studio ~ ' ' ~ row.by) | lower }}">
+          <td class="col-time">{{ row.time }}</td>
+          <td class="col-name">{{ row.name }}</td>
+          <td class="col-studio">{{ row.studio }}</td>
+          <td><span class="badge {{ row.reg_type }}">{{ row.reg_label }}</span></td>
+          <td>
+            <div class="items">
+              {% for item in row['items'] %}
+              <div class="item-line{% if 'Title Audition' in item %} special{% endif %}">• {{ item }}</div>
+              {% endfor %}
+            </div>
+          </td>
+          <td class="col-by">{{ row.by }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+    {% else %}
+    <div class="empty">No students have checked in yet.</div>
+    {% endif %}
+  </div>
+</div>
+
+<script>
+  // ── Summary counts (derived from the rendered item lines) ──
+  (function computeSummary() {
+    let bands = 0, shirts = 0, titles = 0;
+    document.querySelectorAll('#report-table tbody tr').forEach(tr => {
+      tr.querySelectorAll('.item-line').forEach(li => {
+        const t = li.textContent;
+        if (t.includes('Wristband')) bands++;
+        if (t.includes('T-Shirt'))   shirts++;
+        if (t.includes('Title Audition')) titles++;
+      });
+    });
+    const set = (id, v) => { const el = document.getElementById(id); if (el) el.textContent = v; };
+    set('sum-bands', bands);
+    set('sum-shirts', shirts);
+    set('sum-titles', titles);
+  })();
+
+  // ── Search filter ──
+  function filterRows() {
+    const q = document.getElementById('search').value.trim().toLowerCase();
+    document.querySelectorAll('#report-table tbody tr').forEach(tr => {
+      tr.style.display = !q || tr.dataset.search.includes(q) ? '' : 'none';
+    });
+  }
+
+  // ── Column sort ──
+  let sortCol = 0, sortAsc = true;
+  function sortBy(col) {
+    const tbody = document.querySelector('#report-table tbody');
+    if (!tbody) return;
+    sortAsc = (col === sortCol) ? !sortAsc : true;
+    sortCol = col;
+    const rows = [...tbody.querySelectorAll('tr')];
+    rows.sort((a, b) => {
+      let av = a.children[col].textContent.trim().toLowerCase();
+      let bv = b.children[col].textContent.trim().toLowerCase();
+      // Time column: sort chronologically
+      if (col === 0) { av = Date.parse(a.children[0].textContent) || 0; bv = Date.parse(b.children[0].textContent) || 0; }
+      if (av < bv) return sortAsc ? -1 : 1;
+      if (av > bv) return sortAsc ?  1 : -1;
+      return 0;
+    });
+    rows.forEach(r => tbody.appendChild(r));
+    // Update arrows
+    document.querySelectorAll('#report-table thead th .arrow').forEach((el, i) => {
+      el.textContent = (i === col) ? (sortAsc ? '▲' : '▼') : '';
+    });
+  }
+</script>
+</body>
+</html>

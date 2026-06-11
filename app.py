@@ -107,6 +107,26 @@ PRICES = {
     'both':     22500,  # $225.00
 }
 
+# ── HAND-OUT ITEMS ──
+# What a student is physically given at check-in, by registration type. Kept in
+# sync with the kiosk's handoutItems() in templates/checkin.html so the report
+# and the check-in screen always agree.
+#   Workshop Only        → Workshop Wristband
+#   Opening Number Only  → Opening Number Wristband + T-Shirt (size)
+#   Workshop & Opening   → Workshop + Opening Number Wristbands + T-Shirt (size)
+#   Title                → both Wristbands + T-Shirt (size) + Title Audition Info Package
+def handout_items(reg):
+    size = reg.tshirt_size or ''
+    shirt = f'T-Shirt ({size})' if size else 'T-Shirt (size not on file)'
+    if reg.is_title:
+        return ['Workshop Wristband', 'Opening Number Wristband', shirt,
+                'Title Audition Information Package']
+    if reg.reg_type == 'both':
+        return ['Workshop Wristband', 'Opening Number Wristband', shirt]
+    if reg.reg_type == 'opening':
+        return ['Opening Number Wristband', shirt]
+    return ['Workshop Wristband']  # workshop (or unknown → default)
+
 # ── QR CODE HELPER ──
 def generate_qr_base64(data: str) -> str:
     qr = qrcode.QRCode(version=1, box_size=8, border=3,
@@ -750,6 +770,49 @@ def admin_export():
             yield ','.join(f'"{str(v)}"' for v in row) + '\n'
     return Response(generate(), mimetype='text/csv',
                     headers={'Content-Disposition': 'attachment; filename=osa_registrations.csv'})
+
+# ── CHECK-IN REPORT ──
+@app.route('/admin/checkin-report')
+def admin_checkin_report():
+    if not session.get('admin'):
+        return redirect(url_for('admin_login'))
+    regs = (Registration.query
+            .filter(Registration.checkin_time.isnot(None))
+            .order_by(Registration.checkin_time).all())
+    rows = [{
+        'name':      r.full_name,
+        'studio':    r.studio_name or '—',
+        'reg_label': r.reg_label,
+        'reg_type':  'title' if r.is_title else (r.reg_type or 'workshop'),
+        'items':     handout_items(r),
+        'time':      r.checkin_time.strftime('%a %m/%d/%Y %I:%M %p'),
+        'by':        r.checkin_by or 'Staff',
+    } for r in regs]
+    return render_template('checkin_report.html', rows=rows, total=len(rows))
+
+@app.route('/admin/checkin-report.csv')
+def admin_checkin_report_csv():
+    if not session.get('admin'):
+        abort(403)
+    import csv
+    from flask import Response
+    regs = (Registration.query
+            .filter(Registration.checkin_time.isnot(None))
+            .order_by(Registration.checkin_time).all())
+    def generate():
+        headers = ['Check-In Time', 'Checked In By', 'First Name', 'Last Name',
+                   'Studio', 'Registration', 'Items Given']
+        yield ','.join(headers) + '\n'
+        for r in regs:
+            row = [
+                r.checkin_time.strftime('%m/%d/%Y %I:%M %p') if r.checkin_time else '',
+                r.checkin_by or 'Staff',
+                r.first_name, r.last_name, r.studio_name or '',
+                r.reg_label, '; '.join(handout_items(r)),
+            ]
+            yield ','.join(f'"{str(v)}"' for v in row) + '\n'
+    return Response(generate(), mimetype='text/csv',
+                    headers={'Content-Disposition': 'attachment; filename=osa_checkin_report.csv'})
 
 # ── STUDIO AUTOCOMPLETE (public — used by registration form) ──
 @app.route('/api/studios')
