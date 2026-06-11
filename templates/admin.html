@@ -177,6 +177,7 @@
     <a href="/register" class="topbar-btn">Registration Form</a>
     <a href="/admin/upload" class="topbar-btn">⬆ Bulk Upload</a>
     <a href="/admin/checkin-report" class="topbar-btn">📋 Check-In Report</a>
+    <a href="/admin/age-report" class="topbar-btn">👥 Age Groups</a>
     <a href="/admin/export" class="topbar-btn primary">⬇ Export CSV</a>
     <a href="/admin/logout" class="topbar-btn">Sign Out</a>
   </div>
@@ -226,6 +227,33 @@
     <div class="stat-card">
       <div class="stat-label">Not Yet Checked In</div>
       <div class="stat-val" id="s-pending2">—</div>
+    </div>
+  </div>
+
+  <!-- AGE GROUP BREAKDOWN -->
+  <div class="stats-header" style="margin-top:6px;">
+    <span>Workshop Age Groups</span>
+    <a href="/admin/age-report" class="topbar-btn" style="margin-left:auto;background:var(--forest);color:#fff;border-color:var(--forest);">📋 Age Group Report →</a>
+  </div>
+  <div class="stats-grid">
+    <div class="stat-card" style="border-left:4px solid #2563A8;">
+      <div class="stat-label">🟦 12 &amp; Under</div>
+      <div class="stat-val" style="color:#2563A8;" id="s-age-younger">{{ counts_age.younger if counts_age else '—' }}</div>
+      <div class="stat-sub" id="s-age-younger-ci"></div>
+    </div>
+    <div class="stat-card" style="border-left:4px solid #6A3080;">
+      <div class="stat-label">🟪 13 &amp; Over</div>
+      <div class="stat-val" style="color:#6A3080;" id="s-age-older">{{ counts_age.older if counts_age else '—' }}</div>
+      <div class="stat-sub" id="s-age-older-ci"></div>
+    </div>
+    <div class="stat-card" style="border-left:4px solid #B42828;">
+      <div class="stat-label">⚠️ Age Unknown</div>
+      <div class="stat-val" style="color:#B42828;" id="s-age-unknown">{{ counts_age.unknown if counts_age else '—' }}</div>
+      <div class="stat-sub">missing birth date</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-label">Total Students</div>
+      <div class="stat-val" id="s-age-total">{{ total }}</div>
     </div>
   </div>
 
@@ -463,6 +491,14 @@
       document.getElementById('s-opening').textContent  = d.opening;
       document.getElementById('s-both').textContent     = d.both;
       document.getElementById('s-pending2').textContent = d.pending;
+      if (d.age) {
+        document.getElementById('s-age-younger').textContent = d.age.younger;
+        document.getElementById('s-age-older').textContent   = d.age.older;
+        document.getElementById('s-age-unknown').textContent = d.age.unknown;
+        document.getElementById('s-age-total').textContent   = d.total;
+        document.getElementById('s-age-younger-ci').textContent = d.age.younger_ci + ' checked in';
+        document.getElementById('s-age-older-ci').textContent   = d.age.older_ci + ' checked in';
+      }
       // T-shirt grid
       if (d.tshirts) {
         const labels = { 'Youth Small':'YS','Youth Medium':'YM','Youth Large':'YL',

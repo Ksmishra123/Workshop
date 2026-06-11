@@ -110,6 +110,18 @@
   /* On the success screen, a compact green version */
   .handout.done { background: var(--green-light); border-top-color: var(--success-border); border-radius: var(--radius); border-bottom: 1px solid var(--success-border); margin-bottom: 22px; text-align: left; }
   .handout.done .handout-title { color: var(--green); }
+
+  /* ROOM / AGE-GROUP BANNER — tells staff which workshop room to send the kid to */
+  .room-banner { padding: 16px 22px; display: flex; align-items: center; gap: 14px; color: #fff; }
+  .room-banner .rb-label { font-size: 11px; font-weight: 800; text-transform: uppercase; letter-spacing: 0.1em; opacity: 0.85; }
+  .room-banner .rb-group { font-size: 24px; font-weight: 800; line-height: 1.1; }
+  .room-banner .rb-age { font-size: 12px; opacity: 0.85; margin-top: 2px; }
+  .room-banner .rb-icon { font-size: 30px; line-height: 1; }
+  .room-banner.younger { background: #2563A8; }   /* blue  = 12 & Under */
+  .room-banner.older   { background: #6A3080; }   /* purple = 13 & Over */
+  .room-banner.unknown { background: #B42828; }   /* red   = age unknown, ask */
+  /* compact version inside the green success card */
+  .room-banner.mini { border-radius: var(--radius); margin-bottom: 16px; padding: 13px 18px; }
   .action-bar { padding: 18px 22px; display: flex; gap: 10px; border-top: 1px solid var(--border); }
   .btn-back { padding: 16px 18px; background: var(--surface2); border: 1.5px solid var(--border); color: var(--muted); border-radius: var(--radius); font-size: 14px; font-weight: 600; cursor: pointer; font-family: Arial, sans-serif; }
   .btn-checkin { flex: 1; padding: 16px; background: var(--green); color: #fff; border: none; border-radius: var(--radius); font-size: 17px; font-weight: 700; cursor: pointer; font-family: Arial, sans-serif; transition: background 0.15s; }
@@ -216,6 +228,14 @@
           </div>
           <div class="s-badge" id="s-badge"></div>
         </div>
+        <div class="room-banner" id="room-banner">
+          <span class="rb-icon" id="rb-icon"></span>
+          <div>
+            <div class="rb-label">Workshop Room</div>
+            <div class="rb-group" id="rb-group"></div>
+            <div class="rb-age" id="rb-age"></div>
+          </div>
+        </div>
         <div class="handout">
           <div class="handout-title">🎁 Hand the student</div>
           <div class="handout-list" id="handout-list"></div>
@@ -244,6 +264,13 @@
         <div class="suc-name" id="suc-name"></div>
         <div class="suc-sub">Successfully checked in</div>
         <div class="suc-time" id="suc-time"></div>
+        <div class="room-banner mini" id="suc-room-banner">
+          <span class="rb-icon" id="suc-rb-icon"></span>
+          <div>
+            <div class="rb-label">Workshop Room</div>
+            <div class="rb-group" id="suc-rb-group"></div>
+          </div>
+        </div>
         <div class="handout done">
           <div class="handout-title">🎁 Hand the student</div>
           <div class="handout-list" id="suc-handout-list"></div>
@@ -433,6 +460,24 @@
     }).join('');
   }
 
+  // ── ROOM / AGE-GROUP BANNER ──
+  // Tells staff which workshop room the kid goes to (12 & Under / 13 & Over).
+  const ROOM_ICONS = { younger: '🟦', older: '🟪', unknown: '⚠️' };
+  function renderRoomBanner(r, ids) {
+    const group = r.age_group || 'unknown';                 // younger | older | unknown
+    const label = r.age_group_label || 'Age Unknown';
+    const banner = document.getElementById(ids.banner);
+    banner.className = (ids.mini ? 'room-banner mini ' : 'room-banner ') + group;
+    document.getElementById(ids.icon).textContent  = ROOM_ICONS[group] || '⚠️';
+    document.getElementById(ids.group).textContent = label;
+    if (ids.age) {
+      const ageEl = document.getElementById(ids.age);
+      ageEl.textContent = (r.age != null)
+        ? `Age ${r.age}` + (group === 'unknown' ? '' : '')
+        : 'No birth date on file — please confirm group';
+    }
+  }
+
   // ── SHOW STUDENT ──
   function showStudent() {
     if (!currentReg) return;
@@ -462,6 +507,7 @@
     else { badge.textContent = 'Workshop Only'; badge.className = 's-badge workshop'; }
 
     renderHandout('handout-list', r);
+    renderRoomBanner(r, { banner:'room-banner', icon:'rb-icon', group:'rb-group', age:'rb-age' });
 
     showScreen('screen-student');
   }
@@ -486,6 +532,7 @@
         document.getElementById('suc-name').textContent = r.full_name;
         document.getElementById('suc-time').textContent = `${r.checkin_time} · ${r.checkin_date}`;
         renderHandout('suc-handout-list', r);
+        renderRoomBanner(r, { banner:'suc-room-banner', icon:'suc-rb-icon', group:'suc-rb-group', mini:true });
         const details = [
           r.studio_name ? `<div class="suc-detail"><strong>${r.studio_name}</strong>Studio</div>` : '',
           `<div class="suc-detail"><strong>${r.reg_label}</strong>Registration</div>`,

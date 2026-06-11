@@ -25,7 +25,7 @@ from square.environment import SquareEnvironment
 
 app = Flask(__name__)
 app.secret_key = os.environ.get('SECRET_KEY', 'dev-secret-change-in-prod')
-# Make the UTC→Eastern converter available in templates as to_local().
+# Make helpers available in templates.
 app.jinja_env.globals['to_local'] = to_local
 
 # ── DATABASE ──
@@ -111,6 +111,9 @@ class Registration(db.Model):
             'checkin_time':  to_local(self.checkin_time).strftime('%I:%M %p') if self.checkin_time else None,
             'checkin_date':  to_local(self.checkin_time).strftime('%m/%d/%Y') if self.checkin_time else None,
             'created_at':    to_local(self.created_at).strftime('%m/%d/%Y') if self.created_at else '',
+            'age':           compute_age(self.birth_date),
+            'age_group':     age_group(self)[0],     # 'younger' | 'older' | 'unknown'
+            'age_group_label': age_group(self)[1],   # '12 & Under' | '13 & Over' | 'Age Unknown'
         }
 
 # ── PRICING ──
@@ -139,6 +142,54 @@ def handout_items(reg):
     if reg.reg_type == 'opening':
         return ['Opening Number Wristband', shirt]
     return ['Workshop Wristband']  # workshop (or unknown → default)
+
+# ── AGE GROUPS ──
+# Workshop is split into two rooms by age (as of the event day):
+#   12 & Under  and  13 & Over
+AGE_CUTOFF = 12   # this age and below → younger group
+
+def compute_age(birth_date):
+    """Parse a MM/DD/YYYY birth date string and return age in years as of today,
+    or None if it can't be parsed."""
+    if not birth_date:
+        return None
+    s = birth_date.strip()
+    for fmt in ('%m/%d/%Y', '%m/%d/%y', '%Y-%m-%d', '%m-%d-%Y'):
+        try:
+            bd = datetime.strptime(s, fmt).date()
+            break
+        except ValueError:
+            bd = None
+    if bd is None:
+        return None
+    today = to_local(datetime.utcnow()).date()
+    age = today.year - bd.year - ((today.month, today.day) < (bd.month, bd.day))
+    return age if 0 <= age < 120 else None
+
+def age_group(reg):
+    """Return (key, label) for the student's age group, or ('unknown', …) if the
+    birth date is missing/unparseable so staff know to ask."""
+    age = compute_age(reg.birth_date)
+    if age is None:
+        return ('unknown', 'Age Unknown')
+    if age <= AGE_CUTOFF:
+        return ('younger', '12 & Under')
+    return ('older', '13 & Over')
+
+# Expose age helpers to templates.
+app.jinja_env.globals['compute_age'] = compute_age
+app.jinja_env.globals['age_group'] = age_group
+
+def age_counts(regs):
+    """Tally regs into age-group counts, with checked-in subcounts."""
+    c = {'younger': 0, 'older': 0, 'unknown': 0,
+         'younger_ci': 0, 'older_ci': 0}
+    for r in regs:
+        key = age_group(r)[0]
+        c[key] += 1
+        if r.checked_in and key in ('younger', 'older'):
+            c[key + '_ci'] += 1
+    return c
 
 # ── QR CODE HELPER ──
 def generate_qr_base64(data: str) -> str:
@@ -504,7 +555,8 @@ def admin():
                            title=title,
                            revenue=revenue,
                            expected=expected,
-                           outstanding=outstanding)
+                           outstanding=outstanding,
+                           counts_age=age_counts(regs))
 
 TSHIRT_SIZES = ['Youth Small','Youth Medium','Youth Large',
                 'Adult Small','Adult Medium','Adult Large','Adult XL','Adult 2XL']
@@ -536,6 +588,7 @@ def admin_stats():
         'opening':  opening,
         'both':     both,
         'tshirts':  tshirts,
+        'age':      age_counts(regs),
     })
 
 @app.route('/admin/tshirts')
@@ -826,6 +879,52 @@ def admin_checkin_report_csv():
             yield ','.join(f'"{str(v)}"' for v in row) + '\n'
     return Response(generate(), mimetype='text/csv',
                     headers={'Content-Disposition': 'attachment; filename=osa_checkin_report.csv'})
+
+# ── AGE-GROUP REPORT ──
+def _age_grouped_rows():
+    """Return {younger:[…], older:[…], unknown:[…]} of student dicts, each list
+    sorted by age then name, for the age-group report."""
+    groups = {'younger': [], 'older': [], 'unknown': []}
+    for r in Registration.query.order_by(Registration.last_name, Registration.first_name).all():
+        key, label = age_group(r)
+        groups[key].append({
+            'name':       r.full_name,
+            'studio':     r.studio_name or '—',
+            'age':        compute_age(r.birth_date),
+            'birth_date': r.birth_date or '—',
+            'reg_label':  r.reg_label,
+            'checked_in': bool(r.checkin_time),
+        })
+    for key in groups:
+        groups[key].sort(key=lambda s: (s['age'] if s['age'] is not None else 999, s['name']))
+    return groups
+
+@app.route('/admin/age-report')
+def admin_age_report():
+    if not session.get('admin'):
+        return redirect(url_for('admin_login'))
+    groups = _age_grouped_rows()
+    return render_template('age_report.html', groups=groups,
+                           counts={k: len(v) for k, v in groups.items()})
+
+@app.route('/admin/age-report.csv')
+def admin_age_report_csv():
+    if not session.get('admin'):
+        abort(403)
+    from flask import Response
+    groups = _age_grouped_rows()
+    label_for = {'younger': '12 & Under', 'older': '13 & Over', 'unknown': 'Age Unknown'}
+    def generate():
+        yield ','.join(['Age Group', 'Age', 'First/Last Name', 'Studio',
+                        'Birth Date', 'Registration', 'Checked In']) + '\n'
+        for key in ('younger', 'older', 'unknown'):
+            for s in groups[key]:
+                row = [label_for[key], s['age'] if s['age'] is not None else '',
+                       s['name'], s['studio'], s['birth_date'], s['reg_label'],
+                       'Yes' if s['checked_in'] else 'No']
+                yield ','.join(f'"{str(v)}"' for v in row) + '\n'
+    return Response(generate(), mimetype='text/csv',
+                    headers={'Content-Disposition': 'attachment; filename=osa_age_groups.csv'})
 
 # ── STUDIO AUTOCOMPLETE (public — used by registration form) ──
 @app.route('/api/studios')

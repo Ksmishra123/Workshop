@@ -1,0 +1,134 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Age Group Report — OSA Admin</title>
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  :root {
+    --forest:#111111;--gold:#C9A84C;--green-mid:#B8952A;
+    --text:#1A1814;--muted:#5A5750;--light:#8A8780;
+    --border:#DDD9D0;--bg:#F5F2EC;--surface:#fff;--surface2:#F4F1EB;
+    --younger:#2563A8;--older:#6A3080;--unknown:#B42828;
+    --radius:10px;--radius-lg:16px;--shadow:0 1px 4px rgba(0,0,0,0.07);
+  }
+  body { font-family: Arial, Helvetica, sans-serif; background: var(--bg); color: var(--text); min-height: 100vh; }
+  .topbar { background: var(--forest); padding: 0 24px; height: 52px; display: flex; align-items: center; gap: 14px; position: sticky; top: 0; z-index: 50; }
+  .topbar img { height: 32px; width: auto; filter: brightness(0) invert(1); }
+  .topbar-title { font-size: 14px; color: rgba(255,255,255,0.6); }
+  .topbar-right { margin-left: auto; display: flex; gap: 10px; }
+  .topbar-btn { background: rgba(255,255,255,0.1); border: 1px solid rgba(255,255,255,0.15); color: rgba(255,255,255,0.8); padding: 6px 14px; border-radius: 6px; font-size: 13px; cursor: pointer; text-decoration: none; font-family: Arial, sans-serif; }
+  .topbar-btn:hover { background: rgba(255,255,255,0.2); }
+  .topbar-btn.primary { background: var(--gold); border-color: var(--gold); color: #1A1814; font-weight: 700; }
+  .stripe { height: 3px; background: linear-gradient(90deg,var(--gold) 0%,var(--green-mid) 50%,var(--gold) 100%); }
+  .main { padding: 28px 32px 60px; max-width: 1100px; margin: 0 auto; }
+  h1 { font-size: 22px; font-weight: 700; margin-bottom: 4px; }
+  .sub { font-size: 14px; color: var(--muted); margin-bottom: 24px; }
+
+  .cols { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
+  .group-card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-lg); overflow: hidden; box-shadow: var(--shadow); }
+  .group-head { padding: 16px 20px; color: #fff; display: flex; align-items: center; gap: 12px; }
+  .group-head .gh-icon { font-size: 26px; }
+  .group-head .gh-name { font-size: 19px; font-weight: 800; }
+  .group-head .gh-count { margin-left: auto; font-size: 24px; font-weight: 800; font-family: 'Courier New', monospace; }
+  .group-head.younger { background: var(--younger); }
+  .group-head.older   { background: var(--older); }
+  .group-head.unknown { background: var(--unknown); }
+  table { width: 100%; border-collapse: collapse; font-size: 13px; }
+  thead th { background: var(--surface2); color: var(--muted); padding: 9px 14px; text-align: left; font-size: 10px; text-transform: uppercase; letter-spacing: 0.06em; }
+  tbody td { padding: 9px 14px; border-bottom: 1px solid var(--border); }
+  tbody tr:last-child td { border-bottom: none; }
+  .age-cell { font-weight: 700; font-family: 'Courier New', monospace; }
+  .name-cell { font-weight: 600; }
+  .studio-cell { color: var(--muted); font-size: 12px; }
+  .ci-dot { display: inline-block; width: 8px; height: 8px; border-radius: 50%; background: #1A5A2A; margin-right: 5px; vertical-align: middle; }
+  .ci-out { color: var(--light); font-size: 12px; }
+  .empty { padding: 30px; text-align: center; color: var(--light); font-size: 13px; }
+  .unknown-wrap { margin-top: 20px; }
+  .note { background: #FFF3DC; border: 1px solid #EDD8A0; color: #7A4A00; border-radius: var(--radius); padding: 12px 16px; font-size: 13px; margin-top: 20px; }
+
+  @media print {
+    .topbar, .stripe, .note { display: none; }
+    body { background: #fff; } .main { padding: 0; max-width: none; }
+    .group-card { break-inside: avoid; border: 1px solid #999; box-shadow: none; }
+    .group-head { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+  }
+  @media (max-width: 760px) { .cols { grid-template-columns: 1fr; } .main { padding: 16px; } }
+</style>
+</head>
+<body>
+
+<div class="topbar">
+  <img src="/static/osa-logo.png" alt="On Stage America">
+  <span style="color:rgba(255,255,255,0.2);">/</span>
+  <div class="topbar-title">Age Group Report</div>
+  <div class="topbar-right">
+    <a href="/admin" class="topbar-btn">← Dashboard</a>
+    <a href="#" onclick="window.print();return false;" class="topbar-btn">🖨 Print</a>
+    <a href="/admin/age-report.csv" class="topbar-btn primary">⬇ Download CSV</a>
+  </div>
+</div>
+<div class="stripe"></div>
+
+<div class="main">
+  <h1>Age Group Report</h1>
+  <p class="sub">Students split into two workshop rooms by age (as of today). A green dot ● means already checked in.</p>
+
+  <div class="cols">
+    {% for key, icon, name in [('younger','🟦','12 & Under'), ('older','🟪','13 & Over')] %}
+    <div class="group-card">
+      <div class="group-head {{ key }}">
+        <span class="gh-icon">{{ icon }}</span>
+        <span class="gh-name">{{ name }}</span>
+        <span class="gh-count">{{ counts[key] }}</span>
+      </div>
+      {% if groups[key] %}
+      <table>
+        <thead><tr><th>Age</th><th>Name</th><th>Studio</th><th>Registration</th></tr></thead>
+        <tbody>
+          {% for s in groups[key] %}
+          <tr>
+            <td class="age-cell">{{ s.age }}</td>
+            <td class="name-cell">
+              {% if s.checked_in %}<span class="ci-dot" title="Checked in"></span>{% endif %}{{ s.name }}
+            </td>
+            <td class="studio-cell">{{ s.studio }}</td>
+            <td>{{ s.reg_label }}</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+      {% else %}
+      <div class="empty">No students in this group.</div>
+      {% endif %}
+    </div>
+    {% endfor %}
+  </div>
+
+  {% if groups['unknown'] %}
+  <div class="group-card unknown-wrap">
+    <div class="group-head unknown">
+      <span class="gh-icon">⚠️</span>
+      <span class="gh-name">Age Unknown — needs a birth date</span>
+      <span class="gh-count">{{ counts['unknown'] }}</span>
+    </div>
+    <table>
+      <thead><tr><th>Name</th><th>Studio</th><th>Birth Date</th><th>Registration</th></tr></thead>
+      <tbody>
+        {% for s in groups['unknown'] %}
+        <tr>
+          <td class="name-cell">{% if s.checked_in %}<span class="ci-dot"></span>{% endif %}{{ s.name }}</td>
+          <td class="studio-cell">{{ s.studio }}</td>
+          <td>{{ s.birth_date }}</td>
+          <td>{{ s.reg_label }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  <div class="note">⚠️ {{ counts['unknown'] }} student(s) have no valid birth date on file, so they couldn't be placed in a group. Add their birth date (MM/DD/YYYY) to sort them automatically.</div>
+  {% endif %}
+</div>
+</body>
+</html>
