@@ -340,9 +340,9 @@
             {% else %}<span class="badge out">Pending</span>{% endif %}
           </td>
           <td class="mono">
-            {% if r.checkin_time %}{{ r.checkin_time.strftime('%I:%M %p') }}{% else %}—{% endif %}
+            {% if r.checkin_time %}{{ to_local(r.checkin_time).strftime('%I:%M %p') }}{% else %}—{% endif %}
           </td>
-          <td class="mono">{{ r.created_at.strftime('%m/%d/%Y') }}</td>
+          <td class="mono">{{ to_local(r.created_at).strftime('%m/%d/%Y') if r.created_at else '—' }}</td>
           <td>
             <div style="display:flex;flex-direction:column;gap:5px;align-items:flex-start;">
             {% if r.checked_in %}

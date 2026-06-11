@@ -4,8 +4,19 @@ import qrcode
 import io
 import base64
 import json
-from datetime import datetime
+from datetime import datetime, timezone
+from zoneinfo import ZoneInfo
 from flask import Flask, render_template, request, redirect, url_for, jsonify, session, abort
+
+# Event-local timezone. Timestamps are stored in UTC (datetime.utcnow) and
+# converted to Eastern only for display, so EDT/EST is handled automatically.
+EVENT_TZ = ZoneInfo('America/New_York')
+
+def to_local(dt):
+    """Convert a naive-UTC datetime (as stored by datetime.utcnow) to Eastern."""
+    if dt is None:
+        return None
+    return dt.replace(tzinfo=timezone.utc).astimezone(EVENT_TZ)
 from flask_sqlalchemy import SQLAlchemy
 from sendgrid import SendGridAPIClient
 from sendgrid.helpers.mail import Mail, Attachment, FileContent, FileName, FileType, Disposition
@@ -14,6 +25,8 @@ from square.environment import SquareEnvironment
 
 app = Flask(__name__)
 app.secret_key = os.environ.get('SECRET_KEY', 'dev-secret-change-in-prod')
+# Make the UTC→Eastern converter available in templates as to_local().
+app.jinja_env.globals['to_local'] = to_local
 
 # ── DATABASE ──
 basedir = os.path.abspath(os.path.dirname(__file__))
@@ -95,9 +108,9 @@ class Registration(db.Model):
             'amount_display':self.amount_display,
             'payment_status':self.payment_status,
             'checked_in':    self.checked_in,
-            'checkin_time':  self.checkin_time.strftime('%I:%M %p') if self.checkin_time else None,
-            'checkin_date':  self.checkin_time.strftime('%m/%d/%Y') if self.checkin_time else None,
-            'created_at':    self.created_at.strftime('%m/%d/%Y'),
+            'checkin_time':  to_local(self.checkin_time).strftime('%I:%M %p') if self.checkin_time else None,
+            'checkin_date':  to_local(self.checkin_time).strftime('%m/%d/%Y') if self.checkin_time else None,
+            'created_at':    to_local(self.created_at).strftime('%m/%d/%Y') if self.created_at else '',
         }
 
 # ── PRICING ──
@@ -439,8 +452,8 @@ def checkin_confirm():
     if reg.checked_in:
         return jsonify({
             'already': True,
-            'checkin_time': reg.checkin_time.strftime('%I:%M %p'),
-            'checkin_date': reg.checkin_time.strftime('%m/%d/%Y'),
+            'checkin_time': to_local(reg.checkin_time).strftime('%I:%M %p'),
+            'checkin_date': to_local(reg.checkin_time).strftime('%m/%d/%Y'),
         })
     reg.checked_in   = True
     reg.checkin_time = datetime.utcnow()
@@ -539,7 +552,7 @@ def admin_tshirts():
             studios.setdefault(r.studio_name, {})
             studios[r.studio_name][r.tshirt_size] = studios[r.studio_name].get(r.tshirt_size, 0) + 1
     studios = dict(sorted(studios.items()))
-    now = datetime.utcnow().strftime('%B %d, %Y at %I:%M %p UTC')
+    now = to_local(datetime.utcnow()).strftime('%B %d, %Y at %I:%M %p ET')
     return render_template('admin_tshirts.html',
                            tshirts=tshirts, total=total,
                            sizes=TSHIRT_SIZES, studios=studios, now=now)
@@ -566,14 +579,14 @@ def admin_checkin():
     if reg.checked_in:
         return jsonify({
             'already': True,
-            'checkin_time': reg.checkin_time.strftime('%I:%M %p'),
-            'checkin_date': reg.checkin_time.strftime('%m/%d/%Y'),
+            'checkin_time': to_local(reg.checkin_time).strftime('%I:%M %p'),
+            'checkin_date': to_local(reg.checkin_time).strftime('%m/%d/%Y'),
         })
     reg.checked_in   = True
     reg.checkin_time = datetime.utcnow()
     reg.checkin_by   = 'Admin'
     db.session.commit()
-    return jsonify({'success': True, 'checkin_time': reg.checkin_time.strftime('%I:%M %p')})
+    return jsonify({'success': True, 'checkin_time': to_local(reg.checkin_time).strftime('%I:%M %p')})
 
 @app.route('/admin/undo-checkin', methods=['POST'])
 def admin_undo_checkin():
@@ -764,8 +777,8 @@ def admin_export():
                 r.routine_name or '', r.reg_label, r.tshirt_size or '',
                 f'${r.amount/100:.2f}', r.payment_status,
                 'Yes' if r.checked_in else 'No',
-                r.checkin_time.strftime('%m/%d/%Y %I:%M %p') if r.checkin_time else '',
-                r.created_at.strftime('%m/%d/%Y'),
+                to_local(r.checkin_time).strftime('%m/%d/%Y %I:%M %p') if r.checkin_time else '',
+                to_local(r.created_at).strftime('%m/%d/%Y') if r.created_at else '',
             ]
             yield ','.join(f'"{str(v)}"' for v in row) + '\n'
     return Response(generate(), mimetype='text/csv',
@@ -785,7 +798,7 @@ def admin_checkin_report():
         'reg_label': r.reg_label,
         'reg_type':  'title' if r.is_title else (r.reg_type or 'workshop'),
         'items':     handout_items(r),
-        'time':      r.checkin_time.strftime('%a %m/%d/%Y %I:%M %p'),
+        'time':      to_local(r.checkin_time).strftime('%a %m/%d/%Y %I:%M %p'),
         'by':        r.checkin_by or 'Staff',
     } for r in regs]
     return render_template('checkin_report.html', rows=rows, total=len(rows))
@@ -805,7 +818,7 @@ def admin_checkin_report_csv():
         yield ','.join(headers) + '\n'
         for r in regs:
             row = [
-                r.checkin_time.strftime('%m/%d/%Y %I:%M %p') if r.checkin_time else '',
+                to_local(r.checkin_time).strftime('%m/%d/%Y %I:%M %p') if r.checkin_time else '',
                 r.checkin_by or 'Staff',
                 r.first_name, r.last_name, r.studio_name or '',
                 r.reg_label, '; '.join(handout_items(r)),
