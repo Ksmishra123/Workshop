@@ -98,6 +98,18 @@
   .info-val { font-size: 14px; font-weight: 500; color: var(--text); }
   .info-val.mono { font-family: 'Courier New', monospace; font-size: 12px; background: var(--green-light); color: var(--green); padding: 2px 7px; border-radius: 4px; display: inline-block; }
   .info-val.empty { color: var(--light); font-style: italic; font-size: 13px; }
+  /* HAND-OUT PANEL — what to give the student */
+  .handout { margin: 0; padding: 18px 22px 20px; background: #FFFBEF; border-top: 2px solid var(--gold); border-bottom: 1px solid var(--border); }
+  .handout-title { font-size: 11px; font-weight: 800; text-transform: uppercase; letter-spacing: 0.1em; color: #8A6200; margin-bottom: 12px; display: flex; align-items: center; gap: 7px; }
+  .handout-list { display: flex; flex-direction: column; gap: 9px; }
+  .handout-item { display: flex; align-items: center; gap: 12px; font-size: 18px; font-weight: 700; color: #1A1814; }
+  .handout-item .ho-check { width: 26px; height: 26px; flex-shrink: 0; border-radius: 7px; background: #fff; border: 2px solid var(--gold); display: flex; align-items: center; justify-content: center; font-size: 15px; color: var(--gold); }
+  .handout-item .ho-size { margin-left: 6px; font-family: 'Courier New', monospace; font-size: 15px; font-weight: 700; background: var(--green); color: #fff; padding: 2px 10px; border-radius: 6px; }
+  .handout-item.special { color: #6A3080; }
+  .handout-item.special .ho-check { border-color: #6A3080; color: #6A3080; }
+  /* On the success screen, a compact green version */
+  .handout.done { background: var(--green-light); border-top-color: var(--success-border); border-radius: var(--radius); border-bottom: 1px solid var(--success-border); margin-bottom: 22px; text-align: left; }
+  .handout.done .handout-title { color: var(--green); }
   .action-bar { padding: 18px 22px; display: flex; gap: 10px; border-top: 1px solid var(--border); }
   .btn-back { padding: 16px 18px; background: var(--surface2); border: 1.5px solid var(--border); color: var(--muted); border-radius: var(--radius); font-size: 14px; font-weight: 600; cursor: pointer; font-family: Arial, sans-serif; }
   .btn-checkin { flex: 1; padding: 16px; background: var(--green); color: #fff; border: none; border-radius: var(--radius); font-size: 17px; font-weight: 700; cursor: pointer; font-family: Arial, sans-serif; transition: background 0.15s; }
@@ -204,6 +216,10 @@
           </div>
           <div class="s-badge" id="s-badge"></div>
         </div>
+        <div class="handout">
+          <div class="handout-title">🎁 Hand the student</div>
+          <div class="handout-list" id="handout-list"></div>
+        </div>
         <div class="info-grid">
           <div class="info-cell"><div class="info-label">Studio</div><div class="info-val" id="s-studio"></div></div>
           <div class="info-cell"><div class="info-label">Gender</div><div class="info-val" id="s-gender"></div></div>
@@ -228,6 +244,10 @@
         <div class="suc-name" id="suc-name"></div>
         <div class="suc-sub">Successfully checked in</div>
         <div class="suc-time" id="suc-time"></div>
+        <div class="handout done">
+          <div class="handout-title">🎁 Hand the student</div>
+          <div class="handout-list" id="suc-handout-list"></div>
+        </div>
         <div class="suc-details" id="suc-details"></div>
         <button class="btn-next" onclick="reset()">✓ Next Student</button>
         <div class="suc-countdown" id="countdown"></div>
@@ -371,6 +391,48 @@
     }
   }
 
+  // ── HAND-OUT ITEMS ──
+  // What to physically give the student, by registration type:
+  //   Workshop Only          → Workshop Wristband
+  //   Opening Number Only     → Opening Number Wristband + T-shirt
+  //   Workshop & Opening      → Workshop + Opening Number Wristbands + T-shirt
+  //   Title                   → both Wristbands + T-shirt + Title Audition Info Package
+  function handoutItems(r) {
+    const items = [];
+    const size  = r.tshirt_size || '';
+    const shirt = () => items.push({ label: 'T-Shirt', size: size || 'size not on file', missing: !size });
+
+    if (r.is_title) {
+      items.push({ label: 'Workshop Wristband' });
+      items.push({ label: 'Opening Number Wristband' });
+      shirt();
+      items.push({ label: 'Title Audition Information Package', special: true });
+    } else if (r.reg_type === 'both') {
+      items.push({ label: 'Workshop Wristband' });
+      items.push({ label: 'Opening Number Wristband' });
+      shirt();
+    } else if (r.reg_type === 'opening') {
+      items.push({ label: 'Opening Number Wristband' });
+      shirt();
+    } else { // workshop (or unknown → default to workshop)
+      items.push({ label: 'Workshop Wristband' });
+    }
+    return items;
+  }
+
+  function renderHandout(targetId, r) {
+    const list = document.getElementById(targetId);
+    list.innerHTML = handoutItems(r).map(it => {
+      const sizeTag = it.size
+        ? `<span class="ho-size"${it.missing ? ' style="background:#B42828;"' : ''}>${it.size}</span>`
+        : '';
+      return `<div class="handout-item${it.special ? ' special' : ''}">
+                <span class="ho-check">✓</span>
+                <span>${it.label}${sizeTag}</span>
+              </div>`;
+    }).join('');
+  }
+
   // ── SHOW STUDENT ──
   function showStudent() {
     if (!currentReg) return;
@@ -399,6 +461,8 @@
     else if (r.reg_type === 'opening') { badge.textContent = 'Opening Number'; badge.className = 's-badge opening'; }
     else { badge.textContent = 'Workshop Only'; badge.className = 's-badge workshop'; }
 
+    renderHandout('handout-list', r);
+
     showScreen('screen-student');
   }
 
@@ -421,6 +485,7 @@
         const r = data.registration;
         document.getElementById('suc-name').textContent = r.full_name;
         document.getElementById('suc-time').textContent = `${r.checkin_time} · ${r.checkin_date}`;
+        renderHandout('suc-handout-list', r);
         const details = [
           r.studio_name ? `<div class="suc-detail"><strong>${r.studio_name}</strong>Studio</div>` : '',
           `<div class="suc-detail"><strong>${r.reg_label}</strong>Registration</div>`,
