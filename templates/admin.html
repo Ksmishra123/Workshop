@@ -337,7 +337,8 @@
           data-studio="{{ r.studio_name | lower }}"
           data-email="{{ r.email | lower }}"
           data-reg="{{ r.reg_type or 'title' if r.is_title else r.reg_type }}"
-          data-checkin="{{ 'in' if r.checked_in else 'out' }}">
+          data-checkin="{{ 'in' if r.checked_in else 'out' }}"
+          data-edit='{{ {"id": r.id, "first_name": r.first_name, "last_name": r.last_name, "studio_name": r.studio_name, "gender": r.gender, "email": r.email, "phone": r.phone, "birth_date": r.birth_date, "tshirt_size": r.tshirt_size} | tojson | forceescape }}'>
           <td class="cb-cell"><input type="checkbox" class="row-cb" value="{{ r.id }}" onchange="onRowCheck(this)"></td>
           <td>
             <div style="font-weight:600;">{{ r.full_name }}</div>
@@ -381,6 +382,10 @@
             {% if not r.is_title and r.payment_status != 'paid' %}
             <button class="btn-checkin-row mark-paid-row" id="paybtn-{{ r.id }}" onclick="markPaidRow('{{ r.id }}','{{ r.full_name }}')">💵 Mark Paid</button>
             {% endif %}
+            <button class="btn-checkin-row" onclick="openEditModal('{{ r.id }}')"
+              {% if not compute_age(r.birth_date) %}style="background:#FFF3DC;border-color:#EDD8A0;color:#7A4A00;font-weight:700;"{% endif %}>
+              ✎ Edit{% if not compute_age(r.birth_date) %} · fix DOB{% endif %}
+            </button>
             </div>
           </td>
         </tr>
@@ -427,6 +432,37 @@
     <div class="modal-actions" id="email-actions">
       <button class="modal-btn confirm" id="email-send-btn" onclick="doSendEmail()">Send</button>
       <button class="modal-btn cancel-btn" onclick="closeEmailModal()">Cancel</button>
+    </div>
+  </div>
+</div>
+
+<!-- EDIT STUDENT MODAL -->
+<div class="modal-overlay" id="edit-modal" onclick="if(event.target===this)closeEditModal()">
+  <div class="modal email-modal">
+    <div class="modal-name" style="margin-bottom:6px;">✎ Edit Student</div>
+    <div class="modal-meta" id="edit-meta" style="margin-bottom:14px;"></div>
+    <input type="hidden" id="edit-id">
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">
+      <div class="email-field"><label>First Name</label><input type="text" id="edit-first_name"></div>
+      <div class="email-field"><label>Last Name</label><input type="text" id="edit-last_name"></div>
+    </div>
+    <div class="email-field">
+      <label>Birth Date <span id="edit-bd-flag" style="color:#B42828;"></span></label>
+      <input type="date" id="edit-birth_date">
+    </div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">
+      <div class="email-field"><label>Studio</label><input type="text" id="edit-studio_name"></div>
+      <div class="email-field"><label>Gender</label><input type="text" id="edit-gender"></div>
+    </div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">
+      <div class="email-field"><label>Email</label><input type="email" id="edit-email"></div>
+      <div class="email-field"><label>Phone</label><input type="text" id="edit-phone"></div>
+    </div>
+    <div class="email-field"><label>T-Shirt Size</label><input type="text" id="edit-tshirt_size"></div>
+    <div class="modal-toast" id="edit-toast"></div>
+    <div class="modal-actions" id="edit-actions">
+      <button class="modal-btn confirm" id="edit-save-btn" onclick="doEdit()">Save Changes</button>
+      <button class="modal-btn cancel-btn" onclick="closeEditModal()">Cancel</button>
     </div>
   </div>
 </div>
@@ -738,6 +774,91 @@
     } catch(e) {
       alert('Update failed: ' + e.message);
       if (btn) { btn.disabled = false; btn.textContent = '💵 Mark Paid'; }
+    }
+  }
+
+  // ── EDIT STUDENT ──
+  // Convert stored MM/DD/YYYY (or YYYY-MM-DD) to the YYYY-MM-DD a date input needs.
+  function toDateInput(bd) {
+    if (!bd) return '';
+    let m = bd.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);   // MM/DD/YYYY
+    if (m) return `${m[3]}-${m[1].padStart(2,'0')}-${m[2].padStart(2,'0')}`;
+    m = bd.match(/^(\d{4})-(\d{2})-(\d{2})$/);             // already ISO
+    if (m) return bd;
+    return '';   // unparseable → leave blank so they pick a fresh date
+  }
+
+  function openEditModal(id) {
+    const row = document.getElementById('row-' + id);
+    let r = {};
+    try { r = JSON.parse(row.dataset.edit); } catch(e) {}
+    document.getElementById('edit-id').value          = id;
+    document.getElementById('edit-first_name').value  = r.first_name || '';
+    document.getElementById('edit-last_name').value   = r.last_name || '';
+    document.getElementById('edit-studio_name').value = r.studio_name || '';
+    document.getElementById('edit-gender').value      = r.gender || '';
+    document.getElementById('edit-email').value       = r.email || '';
+    document.getElementById('edit-phone').value       = r.phone || '';
+    document.getElementById('edit-tshirt_size').value = r.tshirt_size || '';
+    const bdInput = document.getElementById('edit-birth_date');
+    bdInput.value = toDateInput(r.birth_date);
+    // Flag if the stored DOB is missing or couldn't be parsed.
+    document.getElementById('edit-bd-flag').textContent =
+      bdInput.value ? '' : '— missing / invalid, please set';
+    document.getElementById('edit-meta').textContent =
+      `${r.first_name || ''} ${r.last_name || ''} · ${r.studio_name || ''}`.trim();
+    document.getElementById('edit-toast').className = 'modal-toast';
+    document.getElementById('edit-modal').classList.add('show');
+  }
+  function closeEditModal() {
+    document.getElementById('edit-modal').classList.remove('show');
+  }
+
+  async function doEdit() {
+    const id = document.getElementById('edit-id').value;
+    const payload = {
+      first_name:  document.getElementById('edit-first_name').value,
+      last_name:   document.getElementById('edit-last_name').value,
+      studio_name: document.getElementById('edit-studio_name').value,
+      gender:      document.getElementById('edit-gender').value,
+      email:       document.getElementById('edit-email').value,
+      phone:       document.getElementById('edit-phone').value,
+      tshirt_size: document.getElementById('edit-tshirt_size').value,
+      birth_date:  document.getElementById('edit-birth_date').value,  // YYYY-MM-DD
+    };
+    const btn = document.getElementById('edit-save-btn');
+    btn.disabled = true; btn.textContent = 'Saving…';
+    const toast = document.getElementById('edit-toast');
+    try {
+      const res  = await fetch('/admin/edit/' + id, {
+        method: 'POST', headers: {'Content-Type':'application/json'},
+        body: JSON.stringify(payload)
+      });
+      const data = await res.json();
+      if (data.error) {
+        toast.textContent = data.error; toast.className = 'modal-toast error';
+        btn.disabled = false; btn.textContent = 'Save Changes';
+        return;
+      }
+      // Reflect changes in the row without a full reload, then refresh stats
+      // (age group may have changed).
+      const r = data.registration;
+      const row = document.getElementById('row-' + id);
+      row.dataset.edit = JSON.stringify({
+        id, first_name: r.first_name, last_name: r.last_name,
+        studio_name: r.studio_name, gender: r.gender, email: r.email,
+        phone: r.phone, birth_date: r.birth_date, tshirt_size: r.tshirt_size
+      });
+      row.children[1].querySelector('div').textContent = r.full_name;
+      row.children[1].querySelectorAll('div')[1].textContent = r.email;
+      row.children[2].textContent = r.studio_name;
+      toast.textContent = 'Saved ✓'; toast.className = 'modal-toast success';
+      refreshStats();
+      setTimeout(closeEditModal, 700);
+    } catch(e) {
+      toast.textContent = 'Save failed: ' + e.message; toast.className = 'modal-toast error';
+    } finally {
+      btn.disabled = false; btn.textContent = 'Save Changes';
     }
   }
 

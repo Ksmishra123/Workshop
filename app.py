@@ -148,18 +148,41 @@ def handout_items(reg):
 #   12 & Under  and  13 & Over
 AGE_CUTOFF = 12   # this age and below → younger group
 
-def compute_age(birth_date):
-    """Parse a MM/DD/YYYY birth date string and return age in years as of today,
-    or None if it can't be parsed."""
+# Accepted input formats for a birth date (web sends YYYY-MM-DD; CSVs use
+# MM/DD/YYYY etc.). All are normalised to MM/DD/YYYY for storage.
+_BD_FORMATS = ('%m/%d/%Y', '%m/%d/%y', '%Y-%m-%d', '%m-%d-%Y')
+
+def parse_birth_date(birth_date):
+    """Parse a birth-date string into a date object, or None if unparseable."""
     if not birth_date:
         return None
-    s = birth_date.strip()
-    for fmt in ('%m/%d/%Y', '%m/%d/%y', '%Y-%m-%d', '%m-%d-%Y'):
+    s = str(birth_date).strip()
+    for fmt in _BD_FORMATS:
         try:
-            bd = datetime.strptime(s, fmt).date()
-            break
+            return datetime.strptime(s, fmt).date()
         except ValueError:
-            bd = None
+            continue
+    return None
+
+def validate_birth_date(birth_date):
+    """Validate and normalise a birth date. Returns (normalized_mmddyyyy, error).
+    On success error is None; on failure normalized is None and error is a
+    human-readable message. Rejects unparseable dates and dates today/in the
+    future. An empty value is reported as a 'required' error — callers that
+    allow blanks (CSV import) handle that case themselves."""
+    if not birth_date or not str(birth_date).strip():
+        return None, 'Birth date is required'
+    bd = parse_birth_date(birth_date)
+    if bd is None:
+        return None, 'Birth date is not a valid date (use MM/DD/YYYY)'
+    today = to_local(datetime.utcnow()).date()
+    if bd >= today:
+        return None, 'Birth date must be in the past'
+    return bd.strftime('%m/%d/%Y'), None
+
+def compute_age(birth_date):
+    """Return age in years as of today, or None if the date can't be parsed."""
+    bd = parse_birth_date(birth_date)
     if bd is None:
         return None
     today = to_local(datetime.utcnow()).date()
@@ -379,13 +402,18 @@ def submit_registration():
     reg_type = data.get('reg_type', '')
     amount   = 0 if is_title else PRICES.get(reg_type, 0)
 
+    # Validate & normalise birth date (rejects fake/future dates).
+    birth_date, bd_error = validate_birth_date(data.get('birth_date', ''))
+    if bd_error:
+        return jsonify({'error': bd_error}), 400
+
     # Create registration record
     reg = Registration(
         studio_name  = ' '.join(data.get('studio_name', '').strip().split()),
         first_name   = data.get('first_name', '').strip(),
         last_name    = data.get('last_name', '').strip(),
         gender       = data.get('gender', '').strip(),
-        birth_date   = data.get('birth_date', '').strip(),
+        birth_date   = birth_date,
         email        = data.get('email', '').strip().lower(),
         phone        = data.get('phone', '').strip(),
         mobile       = data.get('mobile', '').strip(),
@@ -805,6 +833,43 @@ def admin_mark_paid():
                     'revenue': revenue, 'expected': expected,
                     'outstanding': outstanding})
 
+@app.route('/admin/edit/<reg_id>', methods=['POST'])
+def admin_edit(reg_id):
+    """Edit a registration's details (notably birth date, so missing/bad DOBs
+    can be fixed). Birth date is validated and normalised; other text fields
+    are updated as-is."""
+    if not session.get('admin'):
+        abort(403)
+    reg = db.session.get(Registration, reg_id)
+    if not reg:
+        return jsonify({'error': 'Registration not found'}), 404
+    data = request.get_json() or {}
+
+    # Birth date: if provided, validate; allow clearing it to blank.
+    if 'birth_date' in data:
+        raw = (data.get('birth_date') or '').strip()
+        if raw:
+            norm, err = validate_birth_date(raw)
+            if err:
+                return jsonify({'error': err}), 400
+            reg.birth_date = norm
+        else:
+            reg.birth_date = ''
+
+    # Other editable text fields.
+    for field in ('first_name', 'last_name', 'studio_name', 'gender',
+                  'email', 'phone', 'tshirt_size'):
+        if field in data:
+            val = (data.get(field) or '').strip()
+            if field == 'email':
+                val = val.lower()
+            if field == 'studio_name':
+                val = ' '.join(val.split())
+            setattr(reg, field, val)
+
+    db.session.commit()
+    return jsonify({'success': True, 'registration': reg.to_dict()})
+
 @app.route('/admin/logout')
 def admin_logout():
     session.pop('admin', None)
@@ -1079,12 +1144,27 @@ def admin_upload_process():
 
         amount = 0 if is_title else PRICES.get(reg_type, 0)
 
+        # Normalise the birth date if valid; flag (but still import) blank or
+        # bad dates so they can be fixed later via the dashboard / age report.
+        raw_bd = row.get('birth_date', '')
+        norm_bd, bd_error = validate_birth_date(raw_bd)
+        if bd_error:
+            store_bd = ''  # don't store a fake/garbage date
+            if (raw_bd or '').strip():
+                errors.append(f'Row {row_num}: {first} {last} — bad birth date '
+                              f'"{raw_bd}" (imported, needs fixing)')
+            else:
+                errors.append(f'Row {row_num}: {first} {last} — no birth date '
+                              f'(imported, needs fixing)')
+        else:
+            store_bd = norm_bd
+
         reg = Registration(
             studio_name   = studio_name,
             first_name    = first,
             last_name     = last,
             gender        = row.get('gender', ''),
-            birth_date    = row.get('birth_date', ''),
+            birth_date    = store_bd,
             email         = row.get('email', '').lower(),
             phone         = row.get('phone', ''),
             mobile        = row.get('mobile', ''),
