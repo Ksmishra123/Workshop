@@ -946,11 +946,19 @@ def admin_checkin_report_csv():
                     headers={'Content-Disposition': 'attachment; filename=osa_checkin_report.csv'})
 
 # ── AGE-GROUP REPORT ──
-def _age_grouped_rows():
+def in_opening(reg):
+    """True if a registration performs in the opening number — that's the
+    'opening' and 'both' registration types, plus Title registrants."""
+    return reg.is_title or reg.reg_type in ('opening', 'both')
+
+def _age_grouped_rows(predicate=None):
     """Return {younger:[…], older:[…], unknown:[…]} of student dicts, each list
-    sorted by age then name, for the age-group report."""
+    sorted by age then name, for the age-group report. If `predicate` is given,
+    only registrations for which predicate(reg) is True are included."""
     groups = {'younger': [], 'older': [], 'unknown': []}
     for r in Registration.query.order_by(Registration.last_name, Registration.first_name).all():
+        if predicate and not predicate(r):
+            continue
         key, label = age_group(r)
         groups[key].append({
             'name':       r.full_name,
@@ -990,6 +998,35 @@ def admin_age_report_csv():
                 yield ','.join(f'"{str(v)}"' for v in row) + '\n'
     return Response(generate(), mimetype='text/csv',
                     headers={'Content-Disposition': 'attachment; filename=osa_age_groups.csv'})
+
+# ── OPENING-NUMBER AGE REPORT ──
+@app.route('/admin/opening-report')
+def admin_opening_report():
+    if not session.get('admin'):
+        return redirect(url_for('admin_login'))
+    groups = _age_grouped_rows(predicate=in_opening)
+    return render_template('age_report.html', groups=groups,
+                           counts={k: len(v) for k, v in groups.items()},
+                           opening=True)
+
+@app.route('/admin/opening-report.csv')
+def admin_opening_report_csv():
+    if not session.get('admin'):
+        abort(403)
+    from flask import Response
+    groups = _age_grouped_rows(predicate=in_opening)
+    label_for = {'younger': '12 & Under', 'older': '13 & Over', 'unknown': 'Age Unknown'}
+    def generate():
+        yield ','.join(['Age Group', 'Age', 'First/Last Name', 'Studio',
+                        'Birth Date', 'Registration', 'Checked In']) + '\n'
+        for key in ('younger', 'older', 'unknown'):
+            for s in groups[key]:
+                row = [label_for[key], s['age'] if s['age'] is not None else '',
+                       s['name'], s['studio'], s['birth_date'], s['reg_label'],
+                       'Yes' if s['checked_in'] else 'No']
+                yield ','.join(f'"{str(v)}"' for v in row) + '\n'
+    return Response(generate(), mimetype='text/csv',
+                    headers={'Content-Disposition': 'attachment; filename=osa_opening_number_age_groups.csv'})
 
 # ── STUDIO AUTOCOMPLETE (public — used by registration form) ──
 @app.route('/api/studios')

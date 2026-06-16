@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Age Group Report — OSA Admin</title>
+<title>{{ 'Opening Number Age Groups' if opening else 'Age Group Report' }} — OSA Admin</title>
 <style>
   *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
   :root {
@@ -62,18 +62,23 @@
 <div class="topbar">
   <img src="/static/osa-logo.png" alt="On Stage America">
   <span style="color:rgba(255,255,255,0.2);">/</span>
-  <div class="topbar-title">Age Group Report</div>
+  <div class="topbar-title">{{ 'Opening Number — Age Groups' if opening else 'Age Group Report' }}</div>
   <div class="topbar-right">
     <a href="/admin" class="topbar-btn">← Dashboard</a>
     <a href="#" onclick="window.print();return false;" class="topbar-btn">🖨 Print</a>
-    <a href="/admin/age-report.csv" class="topbar-btn primary">⬇ Download CSV</a>
+    <a href="{{ '/admin/opening-report.csv' if opening else '/admin/age-report.csv' }}" class="topbar-btn primary">⬇ Download CSV</a>
   </div>
 </div>
 <div class="stripe"></div>
 
 <div class="main">
+  {% if opening %}
+  <h1>Opening Number — Age Groups</h1>
+  <p class="sub">All students performing in the opening number (Opening Number Only, Workshop &amp; Opening, and Title), split by age (as of today). A green dot ● means already checked in.</p>
+  {% else %}
   <h1>Age Group Report</h1>
   <p class="sub">Students split into two workshop rooms by age (as of today). A green dot ● means already checked in.</p>
+  {% endif %}
 
   <div class="cols">
     {% for key, icon, name in [('younger','🟦','12 & Under'), ('older','🟪','13 & Over')] %}
