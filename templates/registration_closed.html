@@ -1,0 +1,51 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Registration Closed — On Stage America</title>
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  :root {
+    --forest:#111111;--gold:#C9A84C;--green-mid:#B8952A;
+    --text:#1A1814;--muted:#5A5750;--light:#8A8780;
+    --border:#DDD9D0;--bg:#F5F2EC;--surface:#fff;
+    --radius:10px;--radius-lg:16px;--shadow:0 4px 24px rgba(0,0,0,0.10);
+  }
+  body { font-family: Arial, Helvetica, sans-serif; background: var(--bg); color: var(--text); min-height: 100vh; display: flex; align-items: center; justify-content: center; padding: 24px; }
+  .card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-lg); box-shadow: var(--shadow); max-width: 540px; width: 100%; overflow: hidden; text-align: center; }
+  .card-top { background: var(--forest); padding: 36px 32px 28px; }
+  .logo { height: 44px; width: auto; filter: brightness(0) invert(1); margin-bottom: 18px; }
+  .stripe { height: 3px; background: linear-gradient(90deg,var(--gold) 0%,var(--green-mid) 50%,var(--gold) 100%); }
+  .card-body { padding: 40px 36px 44px; }
+  .icon { font-size: 52px; margin-bottom: 16px; }
+  h1 { font-family: Georgia, serif; font-size: 28px; color: var(--text); margin-bottom: 14px; }
+  p { font-size: 15px; color: var(--muted); line-height: 1.7; margin-bottom: 8px; }
+  .deadline-note { display: inline-block; margin-top: 18px; background: var(--bg); border: 1px solid var(--border); border-radius: var(--radius); padding: 12px 20px; font-size: 14px; color: var(--text); }
+  .deadline-note strong { color: var(--green-mid); }
+  .footer { padding: 20px 36px; border-top: 1px solid var(--border); font-size: 12px; color: var(--light); }
+  .footer a { color: var(--green-mid); text-decoration: none; }
+</style>
+</head>
+<body>
+  <div class="card">
+    <div class="card-top">
+      <img src="/static/osa-logo.png" alt="On Stage America" class="logo">
+    </div>
+    <div class="stripe"></div>
+    <div class="card-body">
+      <div class="icon">🔒</div>
+      <h1>Registration Is Closed</h1>
+      <p>Thank you for your interest in the On Stage America workshop.</p>
+      <p>Online registration is no longer being accepted{% if status and status.deadline_display %} (it closed on <strong>{{ status.deadline_display }}</strong>){% endif %}.</p>
+      {% if status and status.deadline_display %}
+      <div class="deadline-note">Registration closed: <strong>{{ status.deadline_display }}</strong></div>
+      {% endif %}
+      <p style="margin-top:22px;">If you have questions or need to register late, please contact us directly.</p>
+    </div>
+    <div class="footer">
+      On Stage America &middot; <a href="mailto:osa@onstageamerica.com">osa@onstageamerica.com</a> &middot; 301-654-8939
+    </div>
+  </div>
+</body>
+</html>

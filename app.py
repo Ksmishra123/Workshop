@@ -116,6 +116,51 @@ class Registration(db.Model):
             'age_group_label': age_group(self)[1],   # '12 & Under' | '13 & Over' | 'Age Unknown'
         }
 
+# ── SETTINGS (single key/value store for things like the registration deadline) ──
+class Setting(db.Model):
+    key   = db.Column(db.String(64), primary_key=True)
+    value = db.Column(db.Text)
+
+def get_setting(key, default=None):
+    s = db.session.get(Setting, key)
+    return s.value if s and s.value is not None else default
+
+def set_setting(key, value):
+    s = db.session.get(Setting, key)
+    if s is None:
+        s = Setting(key=key)
+        db.session.add(s)
+    s.value = value
+    db.session.commit()
+
+# ── REGISTRATION DEADLINE ──
+# Stored as setting 'reg_deadline' = 'YYYY-MM-DD' (the last day registration is
+# open). Registration is open through the end of that day; the page shows a
+# "closing soon" banner during the 7 days before, and "closed" the day after.
+def registration_status():
+    """Return a dict describing whether public registration is open:
+       { open: bool, deadline: 'YYYY-MM-DD'|None, deadline_display: str|None,
+         closing_soon: bool, days_left: int|None }"""
+    raw = get_setting('reg_deadline')
+    if not raw:
+        return {'open': True, 'deadline': None, 'deadline_display': None,
+                'closing_soon': False, 'days_left': None}
+    try:
+        deadline = datetime.strptime(raw, '%Y-%m-%d').date()
+    except ValueError:
+        return {'open': True, 'deadline': None, 'deadline_display': None,
+                'closing_soon': False, 'days_left': None}
+    today = to_local(datetime.utcnow()).date()
+    is_open = today <= deadline
+    days_left = (deadline - today).days  # negative once past
+    return {
+        'open': is_open,
+        'deadline': raw,
+        'deadline_display': deadline.strftime('%B %d, %Y'),
+        'closing_soon': is_open and 0 <= days_left <= 7,
+        'days_left': days_left,
+    }
+
 # ── PRICING ──
 PRICES = {
     'workshop': 7500,   # $75.00
@@ -382,6 +427,10 @@ def get_square_client():
 @app.route('/')
 @app.route('/register')
 def register():
+    status = registration_status()
+    # Registration closed → show the closed page (unless an admin is previewing).
+    if not status['open'] and not session.get('admin'):
+        return render_template('registration_closed.html', status=status)
     sq_app_id  = os.environ.get('SQUARE_APP_ID', '')
     sq_env     = os.environ.get('SQUARE_ENV', 'sandbox')
     sq_location = os.environ.get('SQUARE_LOCATION_ID', '')
@@ -389,7 +438,9 @@ def register():
                            sq_app_id=sq_app_id,
                            sq_env=sq_env,
                            sq_location=sq_location,
-                           prices=PRICES)
+                           prices=PRICES,
+                           reg_status=status,
+                           admin_preview=(not status['open'] and session.get('admin')))
 
 # ── PROCESS REGISTRATION ──
 @app.route('/register/submit', methods=['POST'])
@@ -397,6 +448,10 @@ def submit_registration():
     data = request.get_json()
     if not data:
         return jsonify({'error': 'No data received'}), 400
+
+    # Enforce the registration deadline for the public (admins can still add).
+    if not registration_status()['open'] and not session.get('admin'):
+        return jsonify({'error': 'Registration is closed.'}), 403
 
     is_title = data.get('is_title') == 'yes'
     reg_type = data.get('reg_type', '')
@@ -584,7 +639,8 @@ def admin():
                            revenue=revenue,
                            expected=expected,
                            outstanding=outstanding,
-                           counts_age=age_counts(regs))
+                           counts_age=age_counts(regs),
+                           reg_status=registration_status())
 
 TSHIRT_SIZES = ['Youth Small','Youth Medium','Youth Large',
                 'Adult Small','Adult Medium','Adult Large','Adult XL','Adult 2XL']
@@ -875,32 +931,81 @@ def admin_logout():
     session.pop('admin', None)
     return redirect(url_for('admin_login'))
 
+def _registrations_csv():
+    """Build the full-registrations CSV as a single string (shared by export and
+    the year-archive download). Materialised eagerly so it runs inside the
+    request's app context rather than during lazy streaming."""
+    regs = Registration.query.order_by(Registration.created_at).all()
+    headers = ['ID','First Name','Last Name','Studio','Gender','Birth Date',
+               'Email','Phone','Is Title','Routine','Registration','T-Shirt',
+               'Amount','Payment Status','Checked In','Check-In Time','Created']
+    lines = [','.join(headers)]
+    for r in regs:
+        row = [
+            r.id, r.first_name, r.last_name, r.studio_name, r.gender,
+            r.birth_date, r.email, r.phone,
+            'Yes' if r.is_title else 'No',
+            r.routine_name or '', r.reg_label, r.tshirt_size or '',
+            f'${r.amount/100:.2f}', r.payment_status,
+            'Yes' if r.checked_in else 'No',
+            to_local(r.checkin_time).strftime('%m/%d/%Y %I:%M %p') if r.checkin_time else '',
+            to_local(r.created_at).strftime('%m/%d/%Y') if r.created_at else '',
+        ]
+        lines.append(','.join(f'"{str(v)}"' for v in row))
+    return '\n'.join(lines) + '\n'
+
 @app.route('/admin/export')
 def admin_export():
     if not session.get('admin'):
         abort(403)
-    import csv
     from flask import Response
-    regs = Registration.query.order_by(Registration.created_at).all()
-    def generate():
-        headers = ['ID','First Name','Last Name','Studio','Gender','Birth Date',
-                   'Email','Phone','Is Title','Routine','Registration','T-Shirt',
-                   'Amount','Payment Status','Checked In','Check-In Time','Created']
-        yield ','.join(headers) + '\n'
-        for r in regs:
-            row = [
-                r.id, r.first_name, r.last_name, r.studio_name, r.gender,
-                r.birth_date, r.email, r.phone,
-                'Yes' if r.is_title else 'No',
-                r.routine_name or '', r.reg_label, r.tshirt_size or '',
-                f'${r.amount/100:.2f}', r.payment_status,
-                'Yes' if r.checked_in else 'No',
-                to_local(r.checkin_time).strftime('%m/%d/%Y %I:%M %p') if r.checkin_time else '',
-                to_local(r.created_at).strftime('%m/%d/%Y') if r.created_at else '',
-            ]
-            yield ','.join(f'"{str(v)}"' for v in row) + '\n'
-    return Response(generate(), mimetype='text/csv',
+    return Response(_registrations_csv(), mimetype='text/csv',
                     headers={'Content-Disposition': 'attachment; filename=osa_registrations.csv'})
+
+# ── REGISTRATION DEADLINE ADMIN ──
+@app.route('/admin/set-deadline', methods=['POST'])
+def admin_set_deadline():
+    if not session.get('admin'):
+        abort(403)
+    raw = (request.get_json() or {}).get('deadline', '').strip()
+    if raw == '':
+        # Clear the deadline → registration open indefinitely.
+        set_setting('reg_deadline', '')
+        return jsonify({'success': True, 'status': registration_status()})
+    try:
+        datetime.strptime(raw, '%Y-%m-%d')
+    except ValueError:
+        return jsonify({'error': 'Invalid date'}), 400
+    set_setting('reg_deadline', raw)
+    return jsonify({'success': True, 'status': registration_status()})
+
+# ── START NEW YEAR (archive CSV, then clear all registrations) ──
+@app.route('/admin/archive-download')
+def admin_archive_download():
+    """Download a full CSV backup of all current registrations. Intended to be
+    fetched right before clearing for a new year."""
+    if not session.get('admin'):
+        abort(403)
+    from flask import Response
+    stamp = to_local(datetime.utcnow()).strftime('%Y-%m-%d')
+    return Response(_registrations_csv(), mimetype='text/csv',
+                    headers={'Content-Disposition':
+                             f'attachment; filename=osa_registrations_archive_{stamp}.csv'})
+
+@app.route('/admin/start-new-year', methods=['POST'])
+def admin_start_new_year():
+    """Delete ALL registrations to start a fresh year. The admin UI downloads
+    the archive CSV first; this requires a typed confirmation phrase."""
+    if not session.get('admin'):
+        abort(403)
+    data = request.get_json() or {}
+    if (data.get('confirm') or '').strip().upper() != 'NEW YEAR':
+        return jsonify({'error': 'Confirmation phrase did not match'}), 400
+    deleted = Registration.query.delete()
+    db.session.commit()
+    # A fresh year usually wants a fresh deadline too — clear it.
+    set_setting('reg_deadline', '')
+    return jsonify({'success': True, 'deleted': deleted})
 
 # ── CHECK-IN REPORT ──
 @app.route('/admin/checkin-report')

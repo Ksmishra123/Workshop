@@ -258,6 +258,44 @@
     </div>
   </div>
 
+  <!-- REGISTRATION SETTINGS -->
+  <div class="studio-manager">
+    <div class="studio-manager-header">
+      <div class="studio-manager-title">📅 Registration Deadline</div>
+      <span id="reg-status-pill" style="font-size:12px;font-weight:700;padding:4px 12px;border-radius:100px;"></span>
+    </div>
+    <div class="studio-manager-body open" style="padding:20px;">
+      <p style="font-size:13px;color:var(--muted);margin-bottom:14px;line-height:1.6;">
+        Set the last day the public can register. A "closing soon" banner shows the week before; after the deadline the registration page shows a <strong>Registration Closed</strong> message. You (admin) can still add registrations and bulk-upload after it closes. Leave blank to keep registration open indefinitely.
+      </p>
+      <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:center;">
+        <input type="date" id="deadline-input" value="{{ reg_status.deadline or '' }}"
+          style="padding:10px 13px;border:1.5px solid var(--border);border-radius:8px;font-size:14px;font-family:Arial,sans-serif;">
+        <button class="filter-select" style="background:var(--forest);color:#fff;border-color:var(--forest);font-weight:700;cursor:pointer;" onclick="saveDeadline()">Save Deadline</button>
+        <button class="filter-select" style="cursor:pointer;" onclick="clearDeadline()">Clear (always open)</button>
+        <span id="deadline-toast" style="font-size:13px;font-weight:700;"></span>
+      </div>
+    </div>
+  </div>
+
+  <!-- START NEW YEAR -->
+  <div class="studio-manager" style="border-color:#E8B4B4;">
+    <div class="studio-manager-header" style="background:#7A1A1A;">
+      <div class="studio-manager-title">🗓 Start a New Year</div>
+      <button class="studio-manager-toggle" onclick="toggleNewYear()">Show</button>
+    </div>
+    <div class="studio-manager-body" id="new-year-body" style="padding:20px;">
+      <p style="font-size:13px;color:var(--muted);margin-bottom:14px;line-height:1.6;">
+        When this year's event is over, archive a CSV backup of all <strong>{{ total }}</strong> current registration(s), then clear them to start fresh. <strong style="color:#B42828;">This permanently deletes all registrations</strong> — download the archive first.
+      </p>
+      <div style="display:flex;gap:10px;flex-wrap:wrap;">
+        <a href="/admin/archive-download" class="filter-select" style="background:var(--gold);color:#1A1814;border-color:var(--gold);font-weight:700;text-decoration:none;display:inline-flex;align-items:center;" id="archive-btn" onclick="markArchived()">⬇ 1. Download Archive CSV</a>
+        <button class="filter-select" style="background:#B42828;color:#fff;border-color:#B42828;font-weight:700;cursor:pointer;" onclick="openNewYearModal()">🗑 2. Clear &amp; Start New Year</button>
+      </div>
+      <div id="archived-note" style="display:none;margin-top:10px;font-size:12px;color:var(--success,#1A5A2A);font-weight:700;">✓ Archive downloaded.</div>
+    </div>
+  </div>
+
   <!-- STUDIO MANAGER -->
   <div class="studio-manager">
     <div class="studio-manager-header">
@@ -468,6 +506,21 @@
   </div>
 </div>
 
+<!-- START NEW YEAR MODAL -->
+<div class="modal-overlay" id="ny-modal" onclick="if(event.target===this)closeNewYearModal()">
+  <div class="modal">
+    <div class="modal-name" style="color:#B42828;">🗑 Clear &amp; Start New Year</div>
+    <div class="modal-meta" style="color:var(--muted);margin-bottom:14px;">This permanently deletes <strong>all {{ total }} registration(s)</strong> and clears the deadline. Make sure you downloaded the archive CSV first. This cannot be undone.</div>
+    <p style="font-size:13px;color:var(--muted);">Type <strong style="font-family:'Courier New',monospace;color:#B42828;">NEW YEAR</strong> to confirm:</p>
+    <input class="wipe-input" id="ny-phrase" placeholder="NEW YEAR" oninput="checkNyPhrase()" style="width:100%;padding:11px 14px;border:1.5px solid var(--border);border-radius:8px;font-size:15px;font-family:'Courier New',monospace;margin-top:8px;">
+    <div class="modal-toast" id="ny-toast"></div>
+    <div class="modal-actions" id="ny-actions">
+      <button class="modal-btn danger" id="ny-btn" onclick="doNewYear()" disabled>Delete Everything</button>
+      <button class="modal-btn cancel-btn" onclick="closeNewYearModal()">Cancel</button>
+    </div>
+  </div>
+</div>
+
 <!-- DELETE SELECTED MODAL -->
 <div class="modal-overlay" id="del-modal" onclick="if(event.target===this)closeDeleteModal()">
   <div class="modal">
@@ -498,6 +551,92 @@
 </div>
 
 <script>
+  // ── REGISTRATION DEADLINE ──
+  const REG_STATUS = {{ reg_status | tojson }};
+  function renderStatusPill(st) {
+    const pill = document.getElementById('reg-status-pill');
+    if (!st.deadline) { pill.textContent = 'OPEN (no deadline)'; pill.style.background = '#E8F5EC'; pill.style.color = '#1A5A2A'; return; }
+    if (st.open) {
+      pill.textContent = st.closing_soon ? `CLOSING SOON · ${st.deadline_display}` : `OPEN · closes ${st.deadline_display}`;
+      pill.style.background = st.closing_soon ? '#FFF3DC' : '#E8F5EC';
+      pill.style.color = st.closing_soon ? '#7A4A00' : '#1A5A2A';
+    } else {
+      pill.textContent = `CLOSED · ${st.deadline_display}`;
+      pill.style.background = '#FFE8E8'; pill.style.color = '#B42828';
+    }
+  }
+  renderStatusPill(REG_STATUS);
+
+  function setDeadlineToast(msg, ok) {
+    const t = document.getElementById('deadline-toast');
+    t.textContent = msg; t.style.color = ok ? '#1A5A2A' : '#B42828';
+    if (msg) setTimeout(() => { t.textContent = ''; }, 4000);
+  }
+  async function saveDeadline() {
+    const val = document.getElementById('deadline-input').value;
+    if (!val) { setDeadlineToast('Pick a date, or use Clear.', false); return; }
+    await postDeadline(val);
+  }
+  async function clearDeadline() {
+    document.getElementById('deadline-input').value = '';
+    await postDeadline('');
+  }
+  async function postDeadline(val) {
+    try {
+      const res  = await fetch('/admin/set-deadline', {
+        method: 'POST', headers: {'Content-Type':'application/json'},
+        body: JSON.stringify({deadline: val})
+      });
+      const data = await res.json();
+      if (data.error) { setDeadlineToast(data.error, false); return; }
+      renderStatusPill(data.status);
+      setDeadlineToast(val ? 'Deadline saved ✓' : 'Deadline cleared ✓', true);
+    } catch(e) { setDeadlineToast('Save failed', false); }
+  }
+
+  // ── START NEW YEAR ──
+  function toggleNewYear() {
+    const b = document.getElementById('new-year-body');
+    b.classList.toggle('open');
+    event.target.textContent = b.classList.contains('open') ? 'Hide' : 'Show';
+  }
+  function markArchived() { document.getElementById('archived-note').style.display = 'block'; }
+  function openNewYearModal() {
+    document.getElementById('ny-phrase').value = '';
+    document.getElementById('ny-btn').disabled = true;
+    document.getElementById('ny-toast').className = 'modal-toast';
+    document.getElementById('ny-actions').style.display = '';
+    document.getElementById('ny-modal').classList.add('show');
+    setTimeout(() => document.getElementById('ny-phrase').focus(), 100);
+  }
+  function closeNewYearModal() { document.getElementById('ny-modal').classList.remove('show'); }
+  function checkNyPhrase() {
+    document.getElementById('ny-btn').disabled =
+      document.getElementById('ny-phrase').value.trim().toUpperCase() !== 'NEW YEAR';
+  }
+  async function doNewYear() {
+    document.getElementById('ny-actions').style.display = 'none';
+    const toast = document.getElementById('ny-toast');
+    try {
+      const res  = await fetch('/admin/start-new-year', {
+        method: 'POST', headers: {'Content-Type':'application/json'},
+        body: JSON.stringify({confirm: document.getElementById('ny-phrase').value.trim()})
+      });
+      const data = await res.json();
+      if (data.error) {
+        toast.textContent = data.error; toast.className = 'modal-toast error';
+        document.getElementById('ny-actions').style.display = '';
+        return;
+      }
+      toast.textContent = `Deleted ${data.deleted} registration(s). Reloading…`;
+      toast.className = 'modal-toast success';
+      setTimeout(() => location.reload(), 1200);
+    } catch(e) {
+      toast.textContent = 'Failed: ' + e.message; toast.className = 'modal-toast error';
+      document.getElementById('ny-actions').style.display = '';
+    }
+  }
+
   function filterTable() {
     const q   = document.getElementById('search').value.toLowerCase();
     const reg = document.getElementById('filter-reg').value;

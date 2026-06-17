@@ -155,6 +155,16 @@
   </div>
   <div class="stripe"></div>
 
+  {% if admin_preview %}
+  <div style="max-width:640px;margin:18px auto 0;background:#FFE8E8;border:1px solid #E8B4B4;border-radius:10px;padding:14px 18px;font-size:14px;color:#B42828;text-align:center;font-weight:700;">
+    🔒 Registration is CLOSED to the public — you're seeing this form because you're signed in as admin.
+  </div>
+  {% elif reg_status and reg_status.closing_soon %}
+  <div style="max-width:640px;margin:18px auto 0;background:#FFF3DC;border:1px solid #EDD8A0;border-radius:10px;padding:14px 18px;font-size:14px;color:#7A4A00;text-align:center;font-weight:700;">
+    ⏰ Registration closes on {{ reg_status.deadline_display }}{% if reg_status.days_left == 0 %} — today is the last day!{% elif reg_status.days_left == 1 %} — just 1 day left!{% else %} — only {{ reg_status.days_left }} days left!{% endif %}
+  </div>
+  {% endif %}
+
   <div class="form-card">
     <form id="reg-form" onsubmit="return false;">
 
