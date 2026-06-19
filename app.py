@@ -923,8 +923,45 @@ def admin_edit(reg_id):
                 val = ' '.join(val.split())
             setattr(reg, field, val)
 
+    # Registration type / Title — e.g. a Workshop kid adding the Opening Number.
+    # Changing the type changes the price, so recalc the amount when the kid
+    # hasn't paid yet; if they've already paid, keep their paid amount and
+    # report the balance owed so it can be collected separately.
+    price_note = None
+    type_changed = ('reg_type' in data) or ('is_title' in data)
+    if type_changed:
+        if 'is_title' in data:
+            reg.is_title = bool(data.get('is_title'))
+        if 'reg_type' in data:
+            rt = (data.get('reg_type') or '').strip().lower()
+            if rt in ('workshop', 'opening', 'both'):
+                reg.reg_type = rt
+        new_price = 0 if reg.is_title else PRICES.get(reg.reg_type, 0)
+        if reg.is_title:
+            reg.amount = 0
+            reg.payment_status = 'free'
+        elif reg.payment_status == 'paid':
+            # Already paid — keep what they paid, surface any balance owed.
+            balance = new_price - (reg.amount or 0)
+            if balance > 0:
+                price_note = (f'Registration updated. New total is '
+                              f'${new_price/100:.2f}; ${(reg.amount or 0)/100:.2f} '
+                              f'already paid — ${balance/100:.2f} still owed.')
+            elif balance < 0:
+                price_note = (f'Registration updated. New total is '
+                              f'${new_price/100:.2f}; ${(reg.amount or 0)/100:.2f} '
+                              f'was paid — possible ${-balance/100:.2f} refund.')
+        else:
+            # Not paid yet — just set to the new price, keep it owing.
+            reg.amount = new_price
+            if reg.payment_status not in ('pending', 'invoiced'):
+                reg.payment_status = 'pending'
+
     db.session.commit()
-    return jsonify({'success': True, 'registration': reg.to_dict()})
+    out = {'success': True, 'registration': reg.to_dict()}
+    if price_note:
+        out['note'] = price_note
+    return jsonify(out)
 
 @app.route('/admin/logout')
 def admin_logout():
@@ -1132,6 +1169,119 @@ def admin_opening_report_csv():
                 yield ','.join(f'"{str(v)}"' for v in row) + '\n'
     return Response(generate(), mimetype='text/csv',
                     headers={'Content-Disposition': 'attachment; filename=osa_opening_number_age_groups.csv'})
+
+# ── STUDIO INVOICING ──
+def _invoice_data(studio=None, ids=None):
+    """Build invoice data for unpaid (pending/invoiced) registrations — either
+    for a whole studio or a hand-picked set of IDs. Returns a dict with the
+    studio name, studio email, line items, total (cents), and skipped counts."""
+    q = Registration.query
+    if ids:
+        q = q.filter(Registration.id.in_(ids))
+    elif studio is not None:
+        q = q.filter(Registration.studio_name == studio)
+    regs = q.order_by(Registration.last_name, Registration.first_name).all()
+
+    items, total = [], 0
+    skipped_paid = skipped_free = 0
+    studio_name = studio or ''
+    studio_email = ''
+    for r in regs:
+        if r.is_title:
+            skipped_free += 1
+            continue
+        if r.payment_status == 'paid':
+            skipped_paid += 1
+            continue
+        amt = r.amount or 0
+        total += amt
+        items.append({'name': r.full_name, 'reg_label': r.reg_label,
+                      'amount': amt, 'amount_display': f'${amt/100:.2f}'})
+        if not studio_name and r.studio_name:
+            studio_name = r.studio_name
+        if not studio_email and (r.studio_email or '').strip():
+            studio_email = r.studio_email.strip()
+    return {
+        'studio': studio_name or 'Selected Students',
+        'studio_email': studio_email,
+        'items': items,
+        'count': len(items),
+        'total': total,
+        'total_display': f'${total/100:.2f}',
+        'skipped_paid': skipped_paid,
+        'skipped_free': skipped_free,
+        'date': to_local(datetime.utcnow()).strftime('%B %d, %Y'),
+    }
+
+@app.route('/admin/invoice')
+def admin_invoice():
+    """Printable invoice page for a studio's unpaid kids, or a selected set.
+    Pass ?studio=<name> or ?ids=<comma-separated ids>."""
+    if not session.get('admin'):
+        return redirect(url_for('admin_login'))
+    studio = request.args.get('studio')
+    ids = [i for i in (request.args.get('ids', '').split(',')) if i]
+    data = _invoice_data(studio=studio, ids=ids or None)
+    return render_template('invoice.html', inv=data)
+
+@app.route('/admin/invoice/send', methods=['POST'])
+def admin_invoice_send():
+    """Email a studio's invoice to a recipient (defaults to the studio email)."""
+    if not session.get('admin'):
+        abort(403)
+    sg_key = os.environ.get('SENDGRID_API_KEY')
+    if not sg_key:
+        return jsonify({'error': 'SendGrid API key not configured'}), 500
+    body = request.get_json() or {}
+    studio = body.get('studio')
+    ids = body.get('ids') or None
+    data = _invoice_data(studio=studio, ids=ids)
+    if not data['items']:
+        return jsonify({'error': 'No unpaid registrations to invoice'}), 400
+    to_email = (body.get('to') or data['studio_email'] or '').strip()
+    if not to_email:
+        return jsonify({'error': 'No studio email on file — enter a recipient address'}), 400
+
+    rows_html = ''.join(
+        f'<tr><td style="padding:8px 0;border-bottom:1px solid #eee;">{it["name"]}</td>'
+        f'<td style="padding:8px 0;border-bottom:1px solid #eee;color:#5A5750;">{it["reg_label"]}</td>'
+        f'<td style="padding:8px 0;border-bottom:1px solid #eee;text-align:right;">{it["amount_display"]}</td></tr>'
+        for it in data['items'])
+    cc = os.environ.get('NOTIFY_EMAIL', 'osa@onstageamerica.com')
+    html = f'''<div style="font-family:Arial,sans-serif;max-width:600px;margin:auto;">
+      <div style="background:#111;border-radius:12px 12px 0 0;padding:24px 28px;">
+        <p style="margin:0;font-size:10px;font-weight:700;letter-spacing:0.16em;text-transform:uppercase;color:#C9A84C;">On Stage America</p>
+        <p style="margin:6px 0 0;font-family:Georgia,serif;font-size:26px;color:#fff;">Workshop Invoice</p>
+      </div>
+      <div style="height:3px;background:linear-gradient(90deg,#C9A84C,#e8c96a,#C9A84C);"></div>
+      <div style="background:#fff;padding:26px 28px;">
+        <p style="font-size:14px;color:#1A1814;">Studio: <strong>{data["studio"]}</strong><br>Date: {data["date"]}</p>
+        <table style="width:100%;border-collapse:collapse;font-size:14px;margin-top:14px;">
+          <tr><th style="text-align:left;padding-bottom:8px;border-bottom:2px solid #111;">Student</th>
+              <th style="text-align:left;padding-bottom:8px;border-bottom:2px solid #111;">Registration</th>
+              <th style="text-align:right;padding-bottom:8px;border-bottom:2px solid #111;">Amount</th></tr>
+          {rows_html}
+          <tr><td colspan="2" style="padding:12px 0 0;text-align:right;font-weight:700;font-size:16px;">Total Due:</td>
+              <td style="padding:12px 0 0;text-align:right;font-weight:700;font-size:16px;color:#1A5A2A;">{data["total_display"]}</td></tr>
+        </table>
+        <p style="font-size:13px;color:#5A5750;margin-top:20px;line-height:1.6;">Please remit payment for the {data["count"]} student(s) listed above. Thank you!</p>
+      </div>
+      <div style="background:#1A1814;border-radius:0 0 12px 12px;padding:18px 28px;text-align:center;">
+        <p style="margin:0;font-size:12px;color:rgba(255,255,255,0.4);">osa@onstageamerica.com &middot; 301-654-8939</p>
+      </div>
+    </div>'''
+    try:
+        msg = Mail(from_email=('osa@onstageamerica.com', 'On Stage America'),
+                   to_emails=to_email,
+                   subject=f'On Stage America — Workshop Invoice for {data["studio"]} ({data["total_display"]})',
+                   html_content=html)
+        if cc and cc.lower() != to_email.lower():
+            msg.add_cc(cc)
+        SendGridAPIClient(sg_key).send(msg)
+    except Exception as e:
+        return jsonify({'error': f'Email failed: {e}'}), 500
+    return jsonify({'success': True, 'to': to_email, 'total': data['total_display'],
+                    'count': data['count']})
 
 # ── STUDIO AUTOCOMPLETE (public — used by registration form) ──
 @app.route('/api/studios')

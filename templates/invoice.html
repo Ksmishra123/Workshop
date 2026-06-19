@@ -1,0 +1,121 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Invoice — {{ inv.studio }} — OSA</title>
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  :root {
+    --forest:#111111;--gold:#C9A84C;--green-mid:#B8952A;--green:#1A5A2A;
+    --text:#1A1814;--muted:#5A5750;--light:#8A8780;--border:#DDD9D0;
+    --bg:#F5F2EC;--surface:#fff;--radius:10px;--radius-lg:16px;--shadow:0 2px 16px rgba(0,0,0,0.08);
+  }
+  body { font-family: Arial, Helvetica, sans-serif; background: var(--bg); color: var(--text); padding: 24px; }
+  .toolbar { max-width: 720px; margin: 0 auto 16px; display: flex; gap: 10px; }
+  .btn { padding: 9px 16px; border-radius: 8px; font-size: 13px; font-weight: 700; cursor: pointer; border: 1px solid var(--border); background: var(--surface); color: var(--text); text-decoration: none; font-family: Arial, sans-serif; }
+  .btn.dark { background: var(--forest); color: #fff; border-color: var(--forest); }
+  .btn.gold { background: var(--gold); color: #1A1814; border-color: var(--gold); }
+  .sheet { max-width: 720px; margin: 0 auto; background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-lg); box-shadow: var(--shadow); overflow: hidden; }
+  .sheet-top { background: var(--forest); padding: 30px 36px; display: flex; align-items: center; justify-content: space-between; }
+  .sheet-top img { height: 40px; filter: brightness(0) invert(1); }
+  .sheet-top .inv-word { font-family: Georgia, serif; font-size: 26px; color: #fff; }
+  .stripe { height: 3px; background: linear-gradient(90deg,var(--gold),#e8c96a,var(--gold)); }
+  .sheet-body { padding: 32px 36px 40px; }
+  .meta-row { display: flex; justify-content: space-between; margin-bottom: 24px; font-size: 14px; }
+  .meta-row .label { font-size: 11px; text-transform: uppercase; letter-spacing: 0.06em; color: var(--light); margin-bottom: 3px; }
+  .meta-row strong { font-size: 16px; }
+  table { width: 100%; border-collapse: collapse; font-size: 14px; }
+  thead th { text-align: left; padding: 10px 8px; border-bottom: 2px solid var(--forest); font-size: 12px; text-transform: uppercase; letter-spacing: 0.05em; }
+  thead th.amt, tbody td.amt { text-align: right; }
+  tbody td { padding: 11px 8px; border-bottom: 1px solid var(--border); }
+  tfoot td { padding: 16px 8px 0; font-size: 18px; font-weight: 700; }
+  tfoot td.amt { text-align: right; color: var(--green); }
+  .note { margin-top: 22px; font-size: 13px; color: var(--muted); line-height: 1.6; }
+  .skipped { margin-top: 14px; font-size: 12px; color: var(--light); }
+  .empty { padding: 30px; text-align: center; color: var(--light); }
+  .footer { padding: 18px 36px; border-top: 1px solid var(--border); font-size: 12px; color: var(--light); text-align: center; }
+  @media print { .toolbar { display: none; } body { background: #fff; padding: 0; } .sheet { border: none; box-shadow: none; max-width: none; }
+    .sheet-top, thead th { -webkit-print-color-adjust: exact; print-color-adjust: exact; } }
+</style>
+</head>
+<body>
+  <div class="toolbar">
+    <a href="/admin" class="btn">← Dashboard</a>
+    <a href="#" onclick="window.print();return false;" class="btn dark">🖨 Print / Save PDF</a>
+    <button class="btn gold" onclick="emailInvoice()">✉ Email to Studio</button>
+    <span id="email-status" style="font-size:13px;font-weight:700;align-self:center;"></span>
+  </div>
+
+  <div class="sheet">
+    <div class="sheet-top">
+      <img src="/static/osa-logo.png" alt="On Stage America">
+      <span class="inv-word">Invoice</span>
+    </div>
+    <div class="stripe"></div>
+    <div class="sheet-body">
+      <div class="meta-row">
+        <div>
+          <div class="label">Billed To</div>
+          <strong>{{ inv.studio }}</strong>
+          {% if inv.studio_email %}<div style="color:var(--muted);font-size:13px;">{{ inv.studio_email }}</div>{% endif %}
+        </div>
+        <div style="text-align:right;">
+          <div class="label">Invoice Date</div>
+          <strong>{{ inv.date }}</strong>
+        </div>
+      </div>
+
+      {% if inv['items'] %}
+      <table>
+        <thead>
+          <tr><th>Student</th><th>Registration</th><th class="amt">Amount</th></tr>
+        </thead>
+        <tbody>
+          {% for it in inv['items'] %}
+          <tr><td>{{ it.name }}</td><td style="color:var(--muted);">{{ it.reg_label }}</td><td class="amt">{{ it.amount_display }}</td></tr>
+          {% endfor %}
+        </tbody>
+        <tfoot>
+          <tr><td colspan="2" style="text-align:right;">Total Due</td><td class="amt">{{ inv.total_display }}</td></tr>
+        </tfoot>
+      </table>
+      <p class="note">Please remit payment for the {{ inv.count }} student(s) listed above. Thank you for registering with On Stage America!</p>
+      {% if inv.skipped_paid or inv.skipped_free %}
+      <p class="skipped">Not billed: {% if inv.skipped_paid %}{{ inv.skipped_paid }} already paid{% endif %}{% if inv.skipped_paid and inv.skipped_free %}, {% endif %}{% if inv.skipped_free %}{{ inv.skipped_free }} Title (free){% endif %}.</p>
+      {% endif %}
+      {% else %}
+      <div class="empty">No unpaid registrations to invoice for this studio.</div>
+      {% endif %}
+    </div>
+    <div class="footer">On Stage America &middot; osa@onstageamerica.com &middot; 301-654-8939</div>
+  </div>
+
+<script>
+  const INV = {{ {'studio': inv.studio, 'studio_email': inv.studio_email, 'count': inv.count} | tojson }};
+  // Re-derive scope from the URL so the email matches exactly what's shown.
+  const params = new URLSearchParams(location.search);
+  async function emailInvoice() {
+    if (!INV.count) { alert('Nothing to invoice.'); return; }
+    let to = INV.studio_email;
+    to = prompt('Email this invoice to:', to || '');
+    if (to === null) return;
+    if (!to.trim()) { alert('Please enter a recipient email.'); return; }
+    const status = document.getElementById('email-status');
+    status.textContent = 'Sending…'; status.style.color = '#5A5750';
+    const payload = { to: to.trim() };
+    if (params.get('studio')) payload.studio = params.get('studio');
+    if (params.get('ids'))    payload.ids = params.get('ids').split(',').filter(Boolean);
+    try {
+      const res  = await fetch('/admin/invoice/send', {
+        method: 'POST', headers: {'Content-Type':'application/json'},
+        body: JSON.stringify(payload)
+      });
+      const data = await res.json();
+      if (data.error) { status.textContent = data.error; status.style.color = '#B42828'; return; }
+      status.textContent = `✓ Sent ${data.total} to ${data.to}`; status.style.color = '#1A5A2A';
+    } catch(e) { status.textContent = 'Send failed'; status.style.color = '#B42828'; }
+  }
+</script>
+</body>
+</html>

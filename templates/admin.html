@@ -344,6 +344,7 @@
     <div class="select-bar-count" id="select-count"></div>
     <button class="select-bar-btn clear" onclick="clearSelection()">Deselect All</button>
     <button class="select-bar-btn" id="mark-paid-btn" onclick="markPaidSelected()" style="background:var(--success);color:#fff;border-color:var(--success);">💵 Mark Paid</button>
+    <button class="select-bar-btn" id="invoice-btn" onclick="invoiceSelected()" style="background:var(--gold);color:#1A1814;border-color:var(--gold);">🧾 Invoice</button>
     <button class="select-bar-btn" id="send-qr-btn" onclick="sendQrSelected(false)" style="background:var(--forest);color:#fff;border-color:var(--forest);">📲 Send QR Email</button>
     <button class="select-bar-btn" id="send-qr-test-btn" onclick="sendQrSelected(true)" style="background:var(--gold);color:#1A1814;border-color:var(--gold);">🧪 Send QR to Me (test)</button>
     <button class="select-bar-btn delete" onclick="openDeleteModal()">🗑 Delete Selected</button>
@@ -377,7 +378,7 @@
           data-email="{{ r.email | lower }}"
           data-reg="{{ r.reg_type or 'title' if r.is_title else r.reg_type }}"
           data-checkin="{{ 'in' if r.checked_in else 'out' }}"
-          data-edit='{{ {"id": r.id, "first_name": r.first_name, "last_name": r.last_name, "studio_name": r.studio_name, "gender": r.gender, "email": r.email, "phone": r.phone, "birth_date": r.birth_date, "tshirt_size": r.tshirt_size} | tojson | forceescape }}'>
+          data-edit='{{ {"id": r.id, "first_name": r.first_name, "last_name": r.last_name, "studio_name": r.studio_name, "gender": r.gender, "email": r.email, "phone": r.phone, "birth_date": r.birth_date, "tshirt_size": r.tshirt_size, "reg_type": r.reg_type, "is_title": r.is_title} | tojson | forceescape }}'>
           <td class="cb-cell"><input type="checkbox" class="row-cb" value="{{ r.id }}" onchange="onRowCheck(this)"></td>
           <td>
             <div style="font-weight:600;">{{ r.full_name }}</div>
@@ -497,7 +498,22 @@
       <div class="email-field"><label>Email</label><input type="email" id="edit-email"></div>
       <div class="email-field"><label>Phone</label><input type="text" id="edit-phone"></div>
     </div>
-    <div class="email-field"><label>T-Shirt Size</label><input type="text" id="edit-tshirt_size"></div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">
+      <div class="email-field">
+        <label>Registration Type</label>
+        <select id="edit-reg_type" onchange="onEditTypeChange()">
+          <option value="workshop">Workshop Only — $75</option>
+          <option value="opening">Opening Number Only — $150</option>
+          <option value="both">Workshop &amp; Opening — $225</option>
+        </select>
+      </div>
+      <div class="email-field"><label>T-Shirt Size</label><input type="text" id="edit-tshirt_size"></div>
+    </div>
+    <div class="email-field" style="flex-direction:row;align-items:center;gap:8px;">
+      <input type="checkbox" id="edit-is_title" onchange="onEditTypeChange()" style="width:auto;">
+      <label for="edit-is_title" style="margin:0;text-transform:none;letter-spacing:0;font-size:13px;">⭐ Title Registrant (free — covers everything)</label>
+    </div>
+    <div id="edit-price-note" style="display:none;font-size:13px;background:var(--green-light);border:1px solid var(--success-border,#B8DCC4);border-radius:8px;padding:9px 13px;color:var(--green,#1A5A2A);margin-bottom:6px;"></div>
     <div class="modal-toast" id="edit-toast"></div>
     <div class="modal-actions" id="edit-actions">
       <button class="modal-btn confirm" id="edit-save-btn" onclick="doEdit()">Save Changes</button>
@@ -871,6 +887,13 @@
       document.getElementById('s-outstanding').textContent = '$' + (d.outstanding / 100).toFixed(2);
   }
 
+  function invoiceSelected() {
+    const ids = selectedIds();
+    if (!ids.length) return;
+    // Open the printable invoice for the selected kids (unpaid ones are billed).
+    window.open('/admin/invoice?ids=' + encodeURIComponent(ids.join(',')), '_blank');
+  }
+
   async function markPaidSelected() {
     const ids = selectedIds();
     if (!ids.length) return;
@@ -940,6 +963,8 @@
     document.getElementById('edit-email').value       = r.email || '';
     document.getElementById('edit-phone').value       = r.phone || '';
     document.getElementById('edit-tshirt_size').value = r.tshirt_size || '';
+    document.getElementById('edit-reg_type').value = r.reg_type || 'workshop';
+    document.getElementById('edit-is_title').checked = !!r.is_title;
     const bdInput = document.getElementById('edit-birth_date');
     bdInput.value = toDateInput(r.birth_date);
     // Flag if the stored DOB is missing or couldn't be parsed.
@@ -948,7 +973,15 @@
     document.getElementById('edit-meta').textContent =
       `${r.first_name || ''} ${r.last_name || ''} · ${r.studio_name || ''}`.trim();
     document.getElementById('edit-toast').className = 'modal-toast';
+    document.getElementById('edit-price-note').style.display = 'none';
+    onEditTypeChange();
     document.getElementById('edit-modal').classList.add('show');
+  }
+
+  // Title kids are free and cover everything → disable the type dropdown.
+  function onEditTypeChange() {
+    document.getElementById('edit-reg_type').disabled =
+      document.getElementById('edit-is_title').checked;
   }
   function closeEditModal() {
     document.getElementById('edit-modal').classList.remove('show');
@@ -965,6 +998,8 @@
       phone:       document.getElementById('edit-phone').value,
       tshirt_size: document.getElementById('edit-tshirt_size').value,
       birth_date:  document.getElementById('edit-birth_date').value,  // YYYY-MM-DD
+      reg_type:    document.getElementById('edit-reg_type').value,
+      is_title:    document.getElementById('edit-is_title').checked,
     };
     const btn = document.getElementById('edit-save-btn');
     btn.disabled = true; btn.textContent = 'Saving…';
@@ -980,21 +1015,18 @@
         btn.disabled = false; btn.textContent = 'Save Changes';
         return;
       }
-      // Reflect changes in the row without a full reload, then refresh stats
-      // (age group may have changed).
-      const r = data.registration;
-      const row = document.getElementById('row-' + id);
-      row.dataset.edit = JSON.stringify({
-        id, first_name: r.first_name, last_name: r.last_name,
-        studio_name: r.studio_name, gender: r.gender, email: r.email,
-        phone: r.phone, birth_date: r.birth_date, tshirt_size: r.tshirt_size
-      });
-      row.children[1].querySelector('div').textContent = r.full_name;
-      row.children[1].querySelectorAll('div')[1].textContent = r.email;
-      row.children[2].textContent = r.studio_name;
+      // A balance/refund note means a paid kid changed type — show it and
+      // keep the modal open so the admin sees it. Otherwise reload so the
+      // registration/amount/payment columns + stats all reflect the change.
+      if (data.note) {
+        const note = document.getElementById('edit-price-note');
+        note.textContent = data.note; note.style.display = 'block';
+        toast.textContent = 'Saved ✓'; toast.className = 'modal-toast success';
+        btn.disabled = false; btn.textContent = 'Save Changes';
+        return;
+      }
       toast.textContent = 'Saved ✓'; toast.className = 'modal-toast success';
-      refreshStats();
-      setTimeout(closeEditModal, 700);
+      setTimeout(() => location.reload(), 600);
     } catch(e) {
       toast.textContent = 'Save failed: ' + e.message; toast.className = 'modal-toast error';
     } finally {
@@ -1189,6 +1221,7 @@
         <div class="studio-row-name" id="sname-${CSS.escape(s.name)}">${s.name}</div>
         <div class="studio-row-count">${s.count} registrant${s.count!==1?'s':''}</div>
         <input class="studio-rename-input" id="sinput-${CSS.escape(s.name)}" value="${s.name.replace(/"/g,'&quot;')}">
+        <a class="studio-btn edit" style="text-decoration:none;background:var(--gold,#C9A84C);color:#1A1814;" href="/admin/invoice?studio=${encodeURIComponent(s.name)}" target="_blank">🧾 Invoice</a>
         <button class="studio-btn edit" onclick="editStudio('${s.name.replace(/'/g,"\\'")}')">Rename</button>
         <button class="studio-btn save" id="ssave-${CSS.escape(s.name)}" onclick="saveStudio('${s.name.replace(/'/g,"\\'")}')">Save</button>
         <button class="studio-btn cancel" id="scancel-${CSS.escape(s.name)}" onclick="cancelStudio('${s.name.replace(/'/g,"\\'")}')">Cancel</button>
